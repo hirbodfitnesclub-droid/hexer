@@ -1,0 +1,361 @@
+import React, { useMemo, useState } from 'react';
+import { Task, Note, Priority, Project, Habit } from '../types';
+import { PlusIcon, TargetIcon, ListChecksIcon, BriefcaseIcon, CheckIcon, FlameIcon, NotebookIcon } from './icons';
+
+interface DashboardProps {
+  tasks: Task[];
+  notes: Note[];
+  projects: Project[];
+  habits: Habit[];
+  toggleHabitCompletion: (habitId: string, date: string) => void;
+  toggleTaskCompletion: (taskId: string) => void;
+  selectedDate: Date;
+  setSelectedDate: (date: Date) => void;
+  // FIX: Updated prop type to reflect actual data structure and omit backend-generated fields.
+  addTask: (task: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'status' | 'completed_at'>) => void;
+  addNote: (note: Omit<Note, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void;
+}
+
+// --- Helper Functions ---
+const getDateString = (date: Date) => {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const getPersianDate = (date: Date, options: Intl.DateTimeFormatOptions = {}) => {
+    return date.toLocaleDateString('fa-IR', options);
+};
+
+const isSameDay = (d1: Date, d2: Date) => {
+    return d1.getFullYear() === d2.getFullYear() &&
+           d1.getMonth() === d2.getMonth() &&
+           d1.getDate() === d2.getDate();
+};
+
+// --- Generic Widget Wrapper ---
+const Widget: React.FC<{children: React.ReactNode, className?: string}> = ({ children, className }) => (
+  <div className={`bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-5 shadow-2xl shadow-black/30 ${className}`}>
+    {children}
+  </div>
+);
+
+// --- Header ---
+const DashboardHeader: React.FC = () => (
+    <header>
+        <h1 className="text-3xl font-bold text-white">داشبورد</h1>
+        <p className="text-gray-400 mt-1">مرکز فرماندهی هوشمند شما.</p>
+    </header>
+);
+
+// --- Calendar ---
+const WeekCalendar: React.FC<{ selectedDate: Date; onDateChange: (date: Date) => void; }> = ({ selectedDate, onDateChange }) => {
+    const weekDays = useMemo(() => {
+        const days = [];
+        const today = new Date();
+        const startOfWeek = new Date(selectedDate);
+        startOfWeek.setDate(startOfWeek.getDate() - 3);
+
+        for (let i = 0; i < 7; i++) {
+            const date = new Date(startOfWeek);
+            date.setDate(startOfWeek.getDate() + i);
+            days.push({
+                date,
+                isToday: isSameDay(date, today),
+                isSelected: isSameDay(date, selectedDate),
+                dayName: getPersianDate(date, { weekday: 'short' }),
+                dayNumber: getPersianDate(date, { day: 'numeric' }),
+            });
+        }
+        return days;
+    }, [selectedDate]);
+
+    return (
+        <div className="grid grid-cols-7 gap-2 md:gap-3">
+            {weekDays.map(({ date, isSelected, dayNumber, dayName, isToday }) => (
+                 <button
+                    key={date.toISOString()}
+                    onClick={() => onDateChange(date)}
+                    className="relative flex flex-col justify-center items-center h-20 w-full rounded-2xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-950 focus:ring-fuchsia-500"
+                    aria-label={`انتخاب تاریخ ${getPersianDate(date)}`}
+                    aria-pressed={isSelected}
+                >
+                    <div className={`absolute inset-0 rounded-2xl transition-all duration-300 ${isSelected ? 'bg-fuchsia-600/80 shadow-lg shadow-fuchsia-900/50' : `bg-gray-800/50 ${!isToday && 'hover:bg-gray-800/80'}`}`}></div>
+                    {isToday && !isSelected && (
+                         <div className="absolute inset-0 rounded-2xl border-2 border-sky-500/50 pointer-events-none"></div>
+                    )}
+                    <span className={`relative text-xs font-semibold ${isSelected ? 'text-white' : 'text-gray-400'}`}>{dayName}</span>
+                    <span className="relative text-xl font-bold mt-1 text-white">{dayNumber}</span>
+                </button>
+            ))}
+        </div>
+    );
+};
+
+// --- New Dashboard Widgets ---
+
+const TodaysPlan: React.FC<{
+  tasks: Task[];
+  selectedDate: Date;
+  toggleTaskCompletion: (id: string) => void;
+}> = ({ tasks, selectedDate, toggleTaskCompletion }) => {
+    const todaysTasks = useMemo(() => {
+        // FIX: Replaced timezone-sensitive date comparison with a robust string comparison to avoid timezone bugs.
+        const selectedDateStr = getDateString(selectedDate);
+        return tasks.filter(t => t.due_date && t.due_date.startsWith(selectedDateStr))
+                    .sort((a, b) => (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0));
+    }, [tasks, selectedDate]);
+
+    return (
+        <Widget>
+            <h2 className="text-lg font-bold text-white mb-4">برنامه امروز</h2>
+            {todaysTasks.length > 0 ? (
+                <div className="max-h-64 overflow-y-auto pr-2 space-y-3">
+                    {todaysTasks.map(task => (
+                        // FIX: Property 'isCompleted' does not exist on type 'Task'.
+                        <div key={task.id} className={`flex items-center gap-3 transition-opacity ${task.status === 'done' ? 'opacity-50' : ''}`}>
+                            <button
+                                onClick={() => toggleTaskCompletion(task.id)}
+                                // FIX: Property 'isCompleted' does not exist on type 'Task'.
+                                className={`w-5 h-5 flex-shrink-0 rounded-md border-2 flex items-center justify-center transition-all duration-300 ${task.status === 'done' ? 'bg-sky-500 border-sky-400' : 'border-gray-600 hover:border-sky-500'}`}
+                                // FIX: Property 'isCompleted' does not exist on type 'Task'.
+                                aria-label={task.status === 'done' ? `لغو انجام ${task.title}` : `انجام ${task.title}`}
+                            >
+                                {/* // FIX: Property 'isCompleted' does not exist on type 'Task'. */}
+                                {task.status === 'done' && <CheckIcon className="w-3.5 h-3.5 text-white"/>}
+                            </button>
+                            {/* // FIX: Property 'isCompleted' does not exist on type 'Task'. */}
+                            <span className={`flex-1 text-sm ${task.status === 'done' ? 'text-gray-500 line-through' : 'text-gray-200'}`}>{task.title}</span>
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${task.priority === Priority.High ? 'bg-red-400' : task.priority === Priority.Medium ? 'bg-yellow-400' : 'bg-sky-400'}`}></div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="text-center py-10 text-gray-500 text-sm">
+                    <ListChecksIcon className="w-10 h-10 mx-auto mb-2 text-gray-600" />
+                    <p>امروز کاری برای انجام دادن نیست!</p>
+                </div>
+            )}
+        </Widget>
+    );
+};
+
+const TodaysNotes: React.FC<{ notes: Note[]; selectedDate: Date }> = ({ notes, selectedDate }) => {
+    const todaysNotes = useMemo(() => {
+        // FIX: Property 'createdAt' does not exist on type 'Note'. Did you mean 'created_at'?
+        return notes.filter(n => isSameDay(new Date(n.created_at), selectedDate));
+    }, [notes, selectedDate]);
+
+    return (
+        <div className="bg-black/30 rounded-2xl p-4 shadow-inner ring-1 ring-black/20 flex gap-4 h-40">
+            <div className="flex-shrink-0 flex flex-col items-center justify-center w-20 text-center text-gray-400 border-l border-white/10 pr-2">
+                <NotebookIcon className="w-10 h-10 mb-2" />
+                <span className="text-xs font-semibold">یادداشت ها</span>
+            </div>
+            <div className="flex-1 overflow-hidden flex items-center">
+                {todaysNotes.length > 0 ? (
+                    <div className="flex gap-3 overflow-x-auto pb-2 -mb-2 w-full">
+                        {todaysNotes.map(note => (
+                            <div key={note.id} className="w-48 h-28 flex-shrink-0 bg-gray-800/60 p-3 rounded-lg border border-white/5 flex flex-col">
+                                <h4 className="font-semibold text-sm text-gray-200 truncate">{note.title}</h4>
+                                <p className="text-xs text-gray-400 mt-1 line-clamp-3 flex-1">{note.content}</p>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="flex items-center justify-center w-full">
+                        <p className="text-gray-600 text-sm">امروز یادداشتی ثبت نشده.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const QuickCapture: React.FC<{
+    // FIX: Updated prop type to reflect actual data structure.
+    onAddTask: (task: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'status' | 'completed_at'>) => void;
+    onAddNote: (note: Omit<Note, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void;
+    selectedDate: Date;
+}> = ({ onAddTask, onAddNote, selectedDate }) => {
+    const [input, setInput] = useState('');
+
+    const handleAction = (type: 'task' | 'note') => {
+        if (!input.trim()) return;
+        if (type === 'task') {
+            // FIX: Object literal may only specify known properties, and 'tags' does not exist in type...
+            // FIX: Used 'due_date' instead of 'dueDate'.
+            onAddTask({
+                title: input,
+                priority: Priority.Medium,
+                tags: [],
+                due_date: getDateString(selectedDate),
+            });
+        } else {
+            // FIX: Argument of type '{...}' is not assignable to parameter of type...
+            onAddNote({
+                title: `یادداشت سریع: ${input.substring(0, 20)}`,
+                content: input,
+                tags: ['سریع']
+            });
+        }
+        setInput('');
+    };
+
+    return (
+        <Widget>
+            <h2 className="text-lg font-bold text-white mb-3">ثبت سریع</h2>
+            <textarea
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                placeholder="یک ایده، فکر یا وظیفه را سریع ثبت کن..."
+                className="w-full bg-gray-800/70 p-3 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 h-20"
+            />
+            <div className="grid grid-cols-2 gap-3 mt-3">
+                <button onClick={() => handleAction('task')} disabled={!input.trim()} className="flex items-center justify-center gap-2 w-full p-2.5 bg-sky-600/80 rounded-lg text-white font-semibold hover:bg-sky-600 transition-colors disabled:bg-gray-600 disabled:opacity-50">
+                    <ListChecksIcon className="w-5 h-5"/> <span>ثبت کار</span>
+                </button>
+                 <button onClick={() => handleAction('note')} disabled={!input.trim()} className="flex items-center justify-center gap-2 w-full p-2.5 bg-purple-600/80 rounded-lg text-white font-semibold hover:bg-purple-600 transition-colors disabled:bg-gray-600 disabled:opacity-50">
+                    <NotebookIcon className="w-5 h-5"/> <span>ثبت یادداشت</span>
+                </button>
+            </div>
+        </Widget>
+    );
+};
+
+const StatsOverview: React.FC<{ tasks: Task[], projects: Project[] }> = ({ tasks, projects }) => {
+    const stats = useMemo(() => {
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        // FIX: Property 'isCompleted' and 'dueDate' do not exist on type 'Task'.
+        const overdue = tasks.filter(t => t.status !== 'done' && t.due_date && new Date(t.due_date).setHours(0,0,0,0) < today.getTime()).length;
+        const highPriorityProjects = projects.filter(p => p.priority === Priority.High).length;
+        // FIX: Property 'isCompleted' and 'dueDate' do not exist on type 'Task'.
+        const completedToday = tasks.filter(t => t.status === 'done' && t.due_date && isSameDay(new Date(t.due_date), new Date())).length;
+        // FIX: Property 'isCompleted' and 'dueDate' do not exist on type 'Task'.
+        const inbox = tasks.filter(t => t.status !== 'done' && !t.due_date).length;
+        return { overdue, highPriorityProjects, completedToday, inbox };
+    }, [tasks, projects]);
+
+    const StatCard: React.FC<{ icon: React.ReactNode; value: number; label: string; colorClass: string }> = ({ icon, value, label, colorClass }) => (
+        <div className="bg-gray-800/70 p-4 rounded-xl flex items-center gap-4">
+            <div className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-lg ${colorClass}`}>
+                {icon}
+            </div>
+            <div>
+                <span className="text-2xl font-bold text-white">{value}</span>
+                <p className="text-xs text-gray-400">{label}</p>
+            </div>
+        </div>
+    );
+    
+    return (
+        <Widget>
+            <h2 className="text-lg font-bold text-white mb-4">در یک نگاه</h2>
+            <div className="grid grid-cols-2 gap-3">
+                <StatCard icon={<FlameIcon className="w-5 h-5"/>} value={stats.overdue} label="عقب افتاده" colorClass="bg-red-500/20 text-red-300"/>
+                <StatCard icon={<BriefcaseIcon className="w-5 h-5"/>} value={stats.highPriorityProjects} label="پروژه مهم" colorClass="bg-yellow-500/20 text-yellow-300"/>
+                <StatCard icon={<CheckIcon className="w-5 h-5"/>} value={stats.completedToday} label="انجام شده امروز" colorClass="bg-green-500/20 text-green-300"/>
+                <StatCard icon={<PlusIcon className="w-5 h-5"/>} value={stats.inbox} label="بدون تاریخ" colorClass="bg-gray-500/20 text-gray-300"/>
+            </div>
+        </Widget>
+    );
+};
+
+const HabitTracker: React.FC<{
+    habits: Habit[];
+    onToggle: (id: string, date: string) => void;
+    selectedDate: Date;
+}> = ({ habits, onToggle, selectedDate }) => {
+    const selectedDateString = getDateString(selectedDate);
+    if(habits.length === 0) return null;
+
+    return (
+         <Widget>
+            <h2 className="text-lg font-bold text-white mb-4">رهگیر عادت‌ها</h2>
+            <div className="space-y-2">
+                {habits.map(habit => {
+                    // FIX: Property 'completedDates' does not exist on type 'Habit'. Corrected by updating Habit type.
+                    const isCompleted = habit.completedDates.includes(selectedDateString);
+                    return (
+                        <button key={habit.id} onClick={() => onToggle(habit.id, selectedDateString)} className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${isCompleted ? 'bg-green-500/20' : 'bg-gray-800/70 hover:bg-gray-800'}`}>
+                            <div className={`w-6 h-6 flex-shrink-0 rounded-md flex items-center justify-center border-2 transition-all duration-300 ${isCompleted ? 'bg-green-500 border-green-400' : 'border-gray-600'}`}>
+                                {isCompleted && <CheckIcon className="w-4 h-4 text-white"/>}
+                            </div>
+                            {/* // FIX: Property 'name' does not exist on type 'Habit'. Corrected by updating Habit type. */}
+                            <span className={`text-sm transition-colors duration-300 ${isCompleted ? 'text-green-300 line-through decoration-white/50' : 'text-gray-300'}`}>{habit.name}</span>
+                        </button>
+                    )
+                })}
+            </div>
+        </Widget>
+    );
+};
+
+const KeyProjects: React.FC<{ projects: Project[]; tasks: Task[] }> = ({ projects, tasks }) => {
+    const highPriorityProjects = useMemo(() => {
+        return projects
+            .filter(p => p.priority === Priority.High)
+            .map(p => {
+                // FIX: Property 'projectId' does not exist on type 'Task'. Did you mean 'project_id'?
+                const projectTasks = tasks.filter(t => t.project_id === p.id);
+                // FIX: Property 'isCompleted' does not exist on type 'Task'.
+                const completed = projectTasks.filter(t => t.status === 'done').length;
+                const progress = projectTasks.length > 0 ? Math.round((completed / projectTasks.length) * 100) : 0;
+                return { ...p, progress, remaining: projectTasks.length - completed };
+            })
+            .slice(0, 3);
+    }, [projects, tasks]);
+    
+    if (highPriorityProjects.length === 0) return null;
+
+    return (
+        <Widget>
+            <h2 className="text-lg font-bold text-white mb-4">پروژه‌های کلیدی</h2>
+            <div className="space-y-4">
+                {highPriorityProjects.map(p => (
+                    <div key={p.id}>
+                        <div className="flex justify-between items-center mb-1.5">
+                            <span className="font-semibold text-sm text-gray-200">{p.title}</span>
+                            <span className="text-xs font-mono text-gray-400">{p.progress}%</span>
+                        </div>
+                        <div className="w-full bg-gray-700/50 rounded-full h-1.5">
+                            <div className={`bg-${p.color}-500 h-1.5 rounded-full transition-all duration-500`} style={{ width: `${p.progress}%` }}></div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </Widget>
+    );
+};
+
+// --- Main Dashboard Component ---
+const Dashboard: React.FC<DashboardProps> = (props) => {
+  const { tasks, notes, projects, habits, toggleHabitCompletion, toggleTaskCompletion, selectedDate, setSelectedDate, addTask, addNote } = props;
+
+  return (
+    <div className="p-4 sm:p-6 pb-24 max-w-7xl mx-auto space-y-6">
+      <DashboardHeader />
+      <WeekCalendar selectedDate={selectedDate} onDateChange={setSelectedDate} />
+      
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Main Column */}
+        <div className="lg:col-span-3 space-y-6">
+            <TodaysPlan tasks={tasks} selectedDate={selectedDate} toggleTaskCompletion={toggleTaskCompletion} />
+            <TodaysNotes notes={notes} selectedDate={selectedDate} />
+            <QuickCapture onAddTask={addTask} onAddNote={addNote} selectedDate={selectedDate} />
+        </div>
+
+        {/* Side Column */}
+        <div className="lg:col-span-2 space-y-6">
+            <StatsOverview tasks={tasks} projects={projects} />
+            <HabitTracker habits={habits} onToggle={toggleHabitCompletion} selectedDate={selectedDate} />
+            <KeyProjects projects={projects} tasks={tasks} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
