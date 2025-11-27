@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { Project, Priority, Task, Note } from '../types';
-import { PlusIcon, TrashIcon, BriefcaseIcon, PencilIcon, XIcon, ListChecksIcon, NotebookIcon, LinkIcon, LayoutGridIcon, ChevronDownIcon } from './icons';
+import { PlusIcon, TrashIcon, BriefcaseIcon, PencilIcon, XIcon, ListChecksIcon, NotebookIcon, LayoutGridIcon, ChevronDownIcon } from './icons';
 import Modal from './Modal';
 import TaskEditorModal from './TaskEditorModal';
 import NoteEditorModal from './NoteEditorModal';
@@ -46,6 +47,7 @@ const ProjectDetailsModal: React.FC<{
     const progress = projectTasks.length > 0 ? Math.round((completedTasks.length / projectTasks.length) * 100) : 0;
     
     const colors = colorClasses[project.color] || colorClasses.gray;
+    const priorityInfo = priorityClasses[project.priority] || priorityClasses[Priority.Medium];
 
     if (!isOpen) return null;
     
@@ -77,7 +79,7 @@ const ProjectDetailsModal: React.FC<{
                         </div>
                         <div>
                            <h2 className="text-xl sm:text-2xl font-bold text-white">{project.title}</h2>
-                           <div className={`inline-flex mt-1.5 px-2 py-0.5 text-xs font-semibold rounded-md ${priorityClasses[project.priority].bg} ${priorityClasses[project.priority].text}`}>اولویت: {priorityClasses[project.priority].label}</div>
+                           <div className={`inline-flex mt-1.5 px-2 py-0.5 text-xs font-semibold rounded-md ${priorityInfo.bg} ${priorityInfo.text}`}>اولویت: {priorityInfo.label}</div>
                         </div>
                     </div>
                      <button onClick={onClose} className="absolute top-4 right-4 p-1.5 text-gray-500 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-colors">
@@ -119,7 +121,11 @@ const ProjectDetailsModal: React.FC<{
                     {activeTab === 'tasks' && (
                          <div className="space-y-4 animate-fade-in">
                             <h3 className="text-base font-semibold text-gray-300">کارهای فعال ({activeTasks.length})</h3>
-                            {activeTasks.length > 0 ? activeTasks.map(t => <ItemRow key={t.id} onClick={() => onEditTask(t)} icon={<div className={`w-2.5 h-2.5 rounded-full ${colorClasses[priorityClasses[t.priority].color]?.solidBg || colors.solidBg}`}></div>}>{t.title}</ItemRow>) : <p className="text-gray-500 text-sm text-center py-4">کارهای فعال تمام شده‌اند!</p>}
+                            {activeTasks.length > 0 ? activeTasks.map(t => {
+                                const prioColor = priorityClasses[t.priority]?.color || 'sky';
+                                const prioSolid = colorClasses[prioColor]?.solidBg || colors.solidBg;
+                                return <ItemRow key={t.id} onClick={() => onEditTask(t)} icon={<div className={`w-2.5 h-2.5 rounded-full ${prioSolid}`}></div>}>{t.title}</ItemRow>
+                            }) : <p className="text-gray-500 text-sm text-center py-4">کارهای فعال تمام شده‌اند!</p>}
                            
                            {completedTasks.length > 0 && (
                                <div className="pt-2">
@@ -155,7 +161,7 @@ const ProjectCard: React.FC<{
     onView: (project: Project) => void;
 }> = ({ project, stats, onDelete, onEdit, onView }) => {
     const colors = colorClasses[project.color] || colorClasses.gray;
-    const priority = priorityClasses[project.priority];
+    const priority = priorityClasses[project.priority] || priorityClasses[Priority.Medium];
     
     return (
         <div 
@@ -214,6 +220,8 @@ interface ProjectsViewProps {
   deleteTask: (id: string) => void;
   updateNote: (note: Note) => void;
   deleteNote: (id: string) => void;
+  editingProject: Partial<Project> | null;
+  setEditingProject: React.Dispatch<React.SetStateAction<Partial<Project> | null>>;
 }
 
 const calculateProjectStats = (projectId: string, tasks: Task[]) => {
@@ -229,8 +237,7 @@ const calculateProjectStats = (projectId: string, tasks: Task[]) => {
     return { progress, activeTasks };
 };
 
-const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, tasks, notes, addProject, updateProject, deleteProject, updateTask, deleteTask, updateNote, deleteNote }) => {
-    const [editingProject, setEditingProject] = useState<Partial<Project> | null>(null);
+const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, tasks, notes, addProject, updateProject, deleteProject, updateTask, deleteTask, updateNote, deleteNote, editingProject, setEditingProject }) => {
     const [viewingProject, setViewingProject] = useState<Project | null>(null);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     const [editingNote, setEditingNote] = useState<Note | null>(null);
@@ -291,7 +298,10 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, tasks, notes, add
                 <input type="text" value={editingProject.title || ''} onChange={e => setEditingProject(s => s ? { ...s, title: e.target.value } : null)} placeholder="نام پروژه" className="w-full bg-gray-700/80 p-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500" />
                 <textarea value={editingProject.description || ''} onChange={e => setEditingProject(s => s ? { ...s, description: e.target.value } : null)} placeholder="توضیحات پروژه..." rows={4} className="w-full bg-gray-700/80 p-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500" />
                 <select value={editingProject.priority} onChange={e => setEditingProject(s => s ? { ...s, priority: e.target.value as Priority } : null)} className="w-full bg-gray-700/80 p-3 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-sky-500">
-                    {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
+                    {Object.values(Priority).map(p => {
+                         const label = priorityClasses[p]?.label || p;
+                         return <option key={p} value={p}>{label}</option>
+                    })}
                 </select>
                 <div className="flex items-center gap-2 pt-2">
                     <span className="text-sm text-gray-400">رنگ:</span>

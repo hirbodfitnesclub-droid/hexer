@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Page, Task, Note, ChatMessage, Habit, Project } from './types';
+import { Page, Task, Note, ChatMessage, Habit, Project, ActionResult } from './types';
 import BottomNav from './components/BottomNav';
 import Dashboard from './components/Dashboard';
 import TasksView from './components/TasksView';
@@ -80,6 +80,7 @@ const MainApp: React.FC = () => {
   // Global Modals State
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [editingProject, setEditingProject] = useState<Partial<Project> | null>(null);
 
 
   const { user } = useAuth();
@@ -293,6 +294,38 @@ const MainApp: React.FC = () => {
   // --- Handlers for Chat to open modals ---
   const handleEditTask = (task: Task) => setEditingTask(task);
   const handleEditNote = (note: Note) => setEditingNote(note);
+  const handleEditProject = (project: Project) => setEditingProject(project);
+
+  // --- Injection Handler for AI Results (Optimistic UI) ---
+  const handleInjectResult = (result: ActionResult) => {
+      const { type, operation, data } = result;
+
+      // Generic updater to reduce duplication
+      const updateState = <T extends { id: string }>(setter: React.Dispatch<React.SetStateAction<T[]>>) => {
+          setter(prev => {
+              if (operation === 'create') {
+                  // Prepend new item, remove if duplicate ID exists (race condition safety)
+                  return [data, ...prev.filter(i => i.id !== data.id)];
+              } else {
+                  // Update existing item
+                  return prev.map(i => i.id === data.id ? data : i);
+              }
+          });
+      };
+
+      if (type === 'task') updateState(setTasks);
+      else if (type === 'note') updateState(setNotes);
+      else if (type === 'project') updateState(setProjects);
+      else if (type === 'habit') {
+           // For habits, we need to ensure completedDates exists if creating
+           const habitData = operation === 'create' ? { ...data, completedDates: [] } : data;
+           setHabits(prev => {
+               if (operation === 'create') return [habitData, ...prev.filter(h => h.id !== habitData.id)];
+               return prev.map(h => h.id === habitData.id ? habitData : h);
+           });
+      }
+  };
+
   const handleSaveModalTask = (task: Task | Partial<Task>) => {
       if ('id' in task && task.id) handleUpdateTask(task);
       else handleAddTask(task as any);
@@ -339,12 +372,15 @@ const MainApp: React.FC = () => {
             addProject={handleAddProject} updateProject={handleUpdateProject} deleteProject={handleDeleteProject}
             updateTask={handleUpdateTask} deleteTask={handleDeleteTask}
             updateNote={handleUpdateNote} deleteNote={handleDeleteNote}
+            editingProject={editingProject} setEditingProject={setEditingProject}
           />;
       case Page.Chat:
         return <ChatView 
             messages={chatMessages} setMessages={setChatMessages}
-            tasks={tasks} notes={notes} 
-            onEditTask={handleEditTask} onEditNote={handleEditNote}
+            tasks={tasks} notes={notes} projects={projects}
+            onEditTask={handleEditTask} onEditNote={handleEditNote} onEditProject={handleEditProject}
+            setPage={setCurrentPage}
+            onInjectResult={handleInjectResult}
         />;
       default:
         return <Dashboard 

@@ -88,7 +88,7 @@ export enum Page {
 }
 
 export enum Priority {
-  Low = 'کم',
-  Medium = 'متوسط',
-  High = 'زیاد',
+  Low = 'low',
+  Medium = 'medium',
+  High = 'high',
 }

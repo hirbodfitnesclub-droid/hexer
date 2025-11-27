@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ChatMessage, ChatMode, Citation, Task, Note, ActionResult } from '../types';
-import { BotIcon, UserIcon, SendIcon, SparklesIcon, TargetIcon, LightbulbIcon, PencilIcon, NotebookIcon, ListChecksIcon, LinkIcon, CheckIcon } from './icons';
+import { ChatMessage, ChatMode, Citation, Task, Note, ActionResult, Project, Page } from '../types';
+import { BotIcon, UserIcon, SendIcon, SparklesIcon, TargetIcon, LightbulbIcon, PencilIcon, NotebookIcon, ListChecksIcon, LinkIcon, CheckIcon, BriefcaseIcon, FlameIcon } from './icons';
 import { supabase } from '../services/supabaseClient';
 
 
@@ -10,8 +10,12 @@ interface ChatViewProps {
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   tasks: Task[];
   notes: Note[];
+  projects: Project[];
   onEditTask: (task: Task) => void;
   onEditNote: (note: Note) => void;
+  onEditProject: (project: Project) => void;
+  setPage: (page: Page) => void;
+  onInjectResult: (result: ActionResult) => void;
 }
 
 const CitationCard: React.FC<{ citation: Citation, onClick: () => void }> = ({ citation, onClick }) => (
@@ -23,30 +27,68 @@ const CitationCard: React.FC<{ citation: Citation, onClick: () => void }> = ({ c
 
 const ActionResultCard: React.FC<{ result: ActionResult, onClick: () => void }> = ({ result, onClick }) => {
     const isTask = result.type === 'task';
-    const title = result.data.title;
+    const isNote = result.type === 'note';
+    const isProject = result.type === 'project';
+    const isHabit = result.type === 'habit';
+    
+    // Determine Title
+    let title = '';
+    if (isTask) title = result.data.title;
+    else if (isNote) title = result.data.title;
+    else if (isProject) title = result.data.title;
+    else if (isHabit) title = result.data.name;
+
     const isCreate = result.operation === 'create';
 
+    // Styling configuration based on type
+    let icon = <ListChecksIcon className="w-5 h-5"/>;
+    let bgColor = 'bg-blue-500/10 text-blue-400';
+    let label = 'تسک';
+    let borderColor = 'border-blue-500/20';
+
+    if (isTask) {
+        icon = <ListChecksIcon className="w-5 h-5"/>;
+        bgColor = isCreate ? 'bg-green-500/10 text-green-400' : 'bg-blue-500/10 text-blue-400';
+        label = 'تسک';
+        borderColor = isCreate ? 'border-green-500/20' : 'border-blue-500/20';
+    } else if (isNote) {
+        icon = <NotebookIcon className="w-5 h-5"/>;
+        bgColor = isCreate ? 'bg-purple-500/10 text-purple-400' : 'bg-blue-500/10 text-blue-400';
+        label = 'یادداشت';
+        borderColor = isCreate ? 'border-purple-500/20' : 'border-blue-500/20';
+    } else if (isProject) {
+        icon = <BriefcaseIcon className="w-5 h-5"/>;
+        bgColor = isCreate ? 'bg-sky-500/10 text-sky-400' : 'bg-blue-500/10 text-blue-400';
+        label = 'پروژه';
+        borderColor = isCreate ? 'border-sky-500/20' : 'border-blue-500/20';
+    } else if (isHabit) {
+        icon = <FlameIcon className="w-5 h-5"/>;
+        bgColor = isCreate ? 'bg-red-500/10 text-red-400' : 'bg-blue-500/10 text-blue-400';
+        label = 'عادت';
+        borderColor = isCreate ? 'border-red-500/20' : 'border-blue-500/20';
+    }
+
     return (
-        <button onClick={onClick} className="w-full mt-2 bg-gray-900/40 border border-green-500/20 rounded-xl p-3 flex items-center gap-3 hover:bg-gray-900/80 transition-all text-right group">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isCreate ? 'bg-green-500/10 text-green-400' : 'bg-blue-500/10 text-blue-400'}`}>
-                {isTask ? <ListChecksIcon className="w-5 h-5"/> : <NotebookIcon className="w-5 h-5"/>}
+        <button onClick={onClick} className={`w-full mt-2 bg-gray-900/40 border ${borderColor} rounded-xl p-3 flex items-center gap-3 hover:bg-gray-900/80 transition-all text-right group`}>
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${bgColor}`}>
+                {icon}
             </div>
             <div className="flex-1 overflow-hidden">
                 <div className="flex items-center gap-2 text-xs text-gray-400 mb-0.5">
                     {isCreate ? <span className="text-green-400 font-semibold">ساخته شد</span> : <span className="text-blue-400 font-semibold">بروزرسانی شد</span>}
                     <span>•</span>
-                    <span>{isTask ? 'تسک' : 'یادداشت'}</span>
+                    <span>{label}</span>
                 </div>
                 <h4 className="font-semibold text-gray-200 truncate group-hover:text-white transition-colors">{title}</h4>
             </div>
             <div className="p-1.5 bg-gray-800 rounded-lg text-gray-500 group-hover:bg-sky-600 group-hover:text-white transition-all">
-                <PencilIcon className="w-4 h-4" />
+                {isHabit ? <CheckIcon className="w-4 h-4" /> : <PencilIcon className="w-4 h-4" />}
             </div>
         </button>
     )
 }
 
-const ChatView: React.FC<ChatViewProps> = ({ messages, setMessages, tasks, notes, onEditTask, onEditNote }) => {
+const ChatView: React.FC<ChatViewProps> = ({ messages, setMessages, tasks, notes, projects, onEditTask, onEditNote, onEditProject, setPage, onInjectResult }) => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<ChatMode>('auto');
@@ -77,6 +119,11 @@ const ChatView: React.FC<ChatViewProps> = ({ messages, setMessages, tasks, notes
 
       if (error) {
         throw new Error(error.message);
+      }
+      
+      // Inject result immediately into App state (Optimistic UI)
+      if (data.actionResult) {
+          onInjectResult(data.actionResult);
       }
 
       const aiMessage: ChatMessage = {
@@ -112,13 +159,19 @@ const ChatView: React.FC<ChatViewProps> = ({ messages, setMessages, tasks, notes
   };
 
   const handleActionResultClick = (result: ActionResult) => {
-      // Use the returned data from AI directly, but fallback to searching current state to ensure we have latest
       if (result.type === 'task') {
           const task = tasks.find(t => t.id === result.data.id) || result.data;
           onEditTask(task);
       } else if (result.type === 'note') {
            const note = notes.find(n => n.id === result.data.id) || result.data;
            onEditNote(note);
+      } else if (result.type === 'project') {
+           // We might not have the full project in the list yet due to latency, 
+           // but passing result.data (which is the created project) is safe.
+           onEditProject(result.data);
+      } else if (result.type === 'habit') {
+           // Habits don't have a modal, redirect to Dashboard where habits live.
+           setPage(Page.Dashboard);
       }
   };
 

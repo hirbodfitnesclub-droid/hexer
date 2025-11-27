@@ -15,10 +15,12 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { type, id, content } = await req.json();
+    const payload = await req.json();
+    const { type, id, content } = payload;
     
     if (!content || !id || !type) {
-         return new Response(JSON.stringify({ message: "Invalid payload" }), { status: 400, headers: corsHeaders });
+         console.error("Missing payload fields:", payload);
+         return new Response(JSON.stringify({ message: "Invalid payload: content, id, or type missing" }), { status: 400, headers: corsHeaders });
     }
 
     const API_KEY = Deno.env.get('GEMINI_API_KEY');
@@ -26,18 +28,40 @@ Deno.serve(async (req) => {
     
     const ai = new GoogleGenAI({ apiKey: API_KEY });
     
-    // Generate embedding using text-embedding-004
-    // FIX: Parameter MUST be 'contents' (plural) for the new SDK
+    const contentString = String(content);
+    if (!contentString.trim()) {
+        return new Response(JSON.stringify({ message: "Content is empty, skipping vectorization" }), { status: 200, headers: corsHeaders });
+    }
+
+    // Use explicit structure to avoid parsing issues
     const response = await ai.models.embedContent({
         model: 'text-embedding-004',
-        contents: content, 
+        contents: [
+            {
+                parts: [{ text: contentString }]
+            }
+        ],
     });
     
-    const embedding = response.embedding.values;
+    // Robust Extraction Logic: Check for both plural (embeddings) and singular (embedding)
+    let embeddingValues = null;
+
+    if (response.embeddings && response.embeddings.length > 0 && response.embeddings[0].values) {
+        embeddingValues = response.embeddings[0].values;
+    } else if (response.embedding && response.embedding.values) {
+        embeddingValues = response.embedding.values;
+    }
+
+    if (!embeddingValues) {
+        console.error("Gemini Response Dump:", JSON.stringify(response));
+        throw new Error("Failed to generate embedding: No embedding values returned from Gemini (checked both singular and plural paths).");
+    }
 
     // Use SERVICE_ROLE_KEY as configured by the user
     const SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY');
     if (!SERVICE_ROLE_KEY) throw new Error("Missing SERVICE_ROLE_KEY");
+
+    if (SERVICE_ROLE_KEY.length < 20) throw new Error("SERVICE_ROLE_KEY seems invalid (too short)");
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -48,10 +72,12 @@ Deno.serve(async (req) => {
     
     const { error } = await supabaseClient
         .from(table)
-        .update({ embedding })
+        .update({ embedding: embeddingValues })
         .eq('id', id);
 
-    if (error) throw error;
+    if (error) {
+        throw new Error(`Supabase DB Error: ${error.message} (Hint: Check SERVICE_ROLE_KEY permissions)`);
+    }
 
     return new Response(JSON.stringify({ message: "Vectorized successfully" }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -59,8 +85,11 @@ Deno.serve(async (req) => {
     });
 
   } catch (error) {
-    console.error("Vectorize Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("Vectorize Error Details:", error);
+    return new Response(JSON.stringify({ 
+        error: error.message,
+        stack: error.stack 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });

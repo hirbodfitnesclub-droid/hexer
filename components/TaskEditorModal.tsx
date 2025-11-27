@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Task, Priority, Project, Note } from '../types';
 import { XIcon, TrashIcon, CheckIcon, CalendarIcon, FlagIcon, BriefcaseIcon, NotebookIcon, ChevronDownIcon } from './icons';
@@ -110,7 +111,7 @@ const TaskEditorModal: React.FC<TaskEditorModalProps> = ({ task, isOpen, project
                          <PropertyRow icon={<FlagIcon className="w-5 h-5" />} label="اولویت">
                             <div className="flex gap-2">
                                  {Object.values(Priority).map(p => (
-                                    <button key={p} onClick={() => setFormState(s => ({...s, priority: p}))} className={`px-3 py-1.5 text-xs rounded-lg font-semibold transition-all ${formState.priority === p ? `${priorityConfig[p].bg} ${priorityConfig[p].text} ring-1 ring-inset ring-current` : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'}`}>{p}</button>
+                                    <button key={p} onClick={() => setFormState(s => ({...s, priority: p}))} className={`px-3 py-1.5 text-xs rounded-lg font-semibold transition-all ${formState.priority === p ? `${priorityConfig[p].bg} ${priorityConfig[p].text} ring-1 ring-inset ring-current` : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'}`}>{priorityConfig[p].label}</button>
                                 ))}
                             </div>
                         </PropertyRow>
