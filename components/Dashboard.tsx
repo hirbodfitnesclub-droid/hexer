@@ -11,7 +11,6 @@ interface DashboardProps {
   toggleTaskCompletion: (taskId: string) => void;
   selectedDate: Date;
   setSelectedDate: (date: Date) => void;
-  // FIX: Updated prop type to reflect actual data structure and omit backend-generated fields.
   addTask: (task: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'status' | 'completed_at'>) => void;
   addNote: (note: Omit<Note, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void;
 }
@@ -101,7 +100,6 @@ const TodaysPlan: React.FC<{
   toggleTaskCompletion: (id: string) => void;
 }> = ({ tasks, selectedDate, toggleTaskCompletion }) => {
     const todaysTasks = useMemo(() => {
-        // FIX: Replaced timezone-sensitive date comparison with a robust string comparison to avoid timezone bugs.
         const selectedDateStr = getDateString(selectedDate);
         return tasks.filter(t => t.due_date && t.due_date.startsWith(selectedDateStr))
                     .sort((a, b) => (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0));
@@ -113,19 +111,14 @@ const TodaysPlan: React.FC<{
             {todaysTasks.length > 0 ? (
                 <div className="max-h-64 overflow-y-auto pr-2 space-y-3">
                     {todaysTasks.map(task => (
-                        // FIX: Property 'isCompleted' does not exist on type 'Task'.
                         <div key={task.id} className={`flex items-center gap-3 transition-opacity ${task.status === 'done' ? 'opacity-50' : ''}`}>
                             <button
                                 onClick={() => toggleTaskCompletion(task.id)}
-                                // FIX: Property 'isCompleted' does not exist on type 'Task'.
                                 className={`w-5 h-5 flex-shrink-0 rounded-md border-2 flex items-center justify-center transition-all duration-300 ${task.status === 'done' ? 'bg-sky-500 border-sky-400' : 'border-gray-600 hover:border-sky-500'}`}
-                                // FIX: Property 'isCompleted' does not exist on type 'Task'.
                                 aria-label={task.status === 'done' ? `لغو انجام ${task.title}` : `انجام ${task.title}`}
                             >
-                                {/* // FIX: Property 'isCompleted' does not exist on type 'Task'. */}
                                 {task.status === 'done' && <CheckIcon className="w-3.5 h-3.5 text-white"/>}
                             </button>
-                            {/* // FIX: Property 'isCompleted' does not exist on type 'Task'. */}
                             <span className={`flex-1 text-sm ${task.status === 'done' ? 'text-gray-500 line-through' : 'text-gray-200'}`}>{task.title}</span>
                             <div className={`w-2 h-2 rounded-full flex-shrink-0 ${task.priority === Priority.High ? 'bg-red-400' : task.priority === Priority.Medium ? 'bg-yellow-400' : 'bg-sky-400'}`}></div>
                         </div>
@@ -143,7 +136,6 @@ const TodaysPlan: React.FC<{
 
 const TodaysNotes: React.FC<{ notes: Note[]; selectedDate: Date }> = ({ notes, selectedDate }) => {
     const todaysNotes = useMemo(() => {
-        // FIX: Property 'createdAt' does not exist on type 'Note'. Did you mean 'created_at'?
         return notes.filter(n => isSameDay(new Date(n.created_at), selectedDate));
     }, [notes, selectedDate]);
 
@@ -174,7 +166,6 @@ const TodaysNotes: React.FC<{ notes: Note[]; selectedDate: Date }> = ({ notes, s
 };
 
 const QuickCapture: React.FC<{
-    // FIX: Updated prop type to reflect actual data structure.
     onAddTask: (task: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'status' | 'completed_at'>) => void;
     onAddNote: (note: Omit<Note, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void;
     selectedDate: Date;
@@ -184,8 +175,6 @@ const QuickCapture: React.FC<{
     const handleAction = (type: 'task' | 'note') => {
         if (!input.trim()) return;
         if (type === 'task') {
-            // FIX: Object literal may only specify known properties, and 'tags' does not exist in type...
-            // FIX: Used 'due_date' instead of 'dueDate'.
             onAddTask({
                 title: input,
                 priority: Priority.Medium,
@@ -193,7 +182,6 @@ const QuickCapture: React.FC<{
                 due_date: getDateString(selectedDate),
             });
         } else {
-            // FIX: Argument of type '{...}' is not assignable to parameter of type...
             onAddNote({
                 title: `یادداشت سریع: ${input.substring(0, 20)}`,
                 content: input,
@@ -228,12 +216,9 @@ const StatsOverview: React.FC<{ tasks: Task[], projects: Project[] }> = ({ tasks
     const stats = useMemo(() => {
         const today = new Date();
         today.setHours(0,0,0,0);
-        // FIX: Property 'isCompleted' and 'dueDate' do not exist on type 'Task'.
         const overdue = tasks.filter(t => t.status !== 'done' && t.due_date && new Date(t.due_date).setHours(0,0,0,0) < today.getTime()).length;
         const highPriorityProjects = projects.filter(p => p.priority === Priority.High).length;
-        // FIX: Property 'isCompleted' and 'dueDate' do not exist on type 'Task'.
         const completedToday = tasks.filter(t => t.status === 'done' && t.due_date && isSameDay(new Date(t.due_date), new Date())).length;
-        // FIX: Property 'isCompleted' and 'dueDate' do not exist on type 'Task'.
         const inbox = tasks.filter(t => t.status !== 'done' && !t.due_date).length;
         return { overdue, highPriorityProjects, completedToday, inbox };
     }, [tasks, projects]);
@@ -276,14 +261,12 @@ const HabitTracker: React.FC<{
             <h2 className="text-lg font-bold text-white mb-4">رهگیر عادت‌ها</h2>
             <div className="space-y-2">
                 {habits.map(habit => {
-                    // FIX: Property 'completedDates' does not exist on type 'Habit'. Corrected by updating Habit type.
                     const isCompleted = habit.completedDates.includes(selectedDateString);
                     return (
                         <button key={habit.id} onClick={() => onToggle(habit.id, selectedDateString)} className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${isCompleted ? 'bg-green-500/20' : 'bg-gray-800/70 hover:bg-gray-800'}`}>
                             <div className={`w-6 h-6 flex-shrink-0 rounded-md flex items-center justify-center border-2 transition-all duration-300 ${isCompleted ? 'bg-green-500 border-green-400' : 'border-gray-600'}`}>
                                 {isCompleted && <CheckIcon className="w-4 h-4 text-white"/>}
                             </div>
-                            {/* // FIX: Property 'name' does not exist on type 'Habit'. Corrected by updating Habit type. */}
                             <span className={`text-sm transition-colors duration-300 ${isCompleted ? 'text-green-300 line-through decoration-white/50' : 'text-gray-300'}`}>{habit.name}</span>
                         </button>
                     )
@@ -298,9 +281,7 @@ const KeyProjects: React.FC<{ projects: Project[]; tasks: Task[] }> = ({ project
         return projects
             .filter(p => p.priority === Priority.High)
             .map(p => {
-                // FIX: Property 'projectId' does not exist on type 'Task'. Did you mean 'project_id'?
                 const projectTasks = tasks.filter(t => t.project_id === p.id);
-                // FIX: Property 'isCompleted' does not exist on type 'Task'.
                 const completed = projectTasks.filter(t => t.status === 'done').length;
                 const progress = projectTasks.length > 0 ? Math.round((completed / projectTasks.length) * 100) : 0;
                 return { ...p, progress, remaining: projectTasks.length - completed };

@@ -31,7 +31,7 @@ interface TaskCardProps {
 }
 
 const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, onToggle, onDelete, onEdit }) => {
-    const { color: priorityColor } = priorityConfig[task.priority];
+    const { color: priorityColor } = priorityConfig[task.priority] || priorityConfig[Priority.Medium];
     const [isAnimatingOut, setIsAnimatingOut] = useState(false);
 
     const handleToggle = () => {
@@ -43,18 +43,14 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, onToggle, onDelete
     
     return (
         <div 
-            // FIX: Property 'isCompleted' does not exist on type 'Task & { project?: Project; }'.
             className={`flex items-start gap-3 transition-all duration-300 ${isAnimatingOut ? 'opacity-0 scale-95' : 'opacity-100 scale-100'} ${task.status === 'done' ? 'opacity-60' : ''}`}
         >
             <div className="pt-1.5">
                 <button 
                     onClick={handleToggle} 
-                    // FIX: Property 'isCompleted' does not exist on type 'Task & { project?: Project; }'.
                     className={`w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all duration-300 group ${task.status === 'done' ? `bg-${priorityColor}-500 border-${priorityColor}-500` : 'border-gray-600 hover:border-sky-400'}`}
-                    // FIX: Property 'isCompleted' does not exist on type 'Task & { project?: Project; }'.
                     aria-label={task.status === 'done' ? 'لغو انجام' : 'انجام تسک'}
                 >
-                     {/* // FIX: Property 'isCompleted' does not exist on type 'Task & { project?: Project; }'. */}
                      {task.status === 'done' && (
                         <svg className="w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
                      )}
@@ -64,7 +60,6 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, onToggle, onDelete
               onClick={() => onEdit(task)}
               className="flex-1 bg-gray-800/60 p-3.5 rounded-xl border border-white/10 group relative overflow-hidden cursor-pointer hover:bg-gray-800/80 transition-colors"
             >
-                {/* // FIX: Property 'isCompleted' does not exist on type 'Task & { project?: Project; }'. */}
                 <p className={`font-medium transition-colors duration-300 break-words ${task.status === 'done' ? 'line-through text-gray-500' : 'text-gray-200'}`}>
                     {task.title}
                 </p>
@@ -75,7 +70,6 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, onToggle, onDelete
                             <span>{task.project.title}</span>
                         </div>
                     )}
-                    {/* // FIX: Property 'dueDate' does not exist on type 'Task & { project?: Project; }'. Did you mean 'due_date'? */}
                     {task.due_date && (
                         <span>{new Date(task.due_date).toLocaleDateString('fa-IR', { month: 'short', day: 'numeric' })}</span>
                     )}
@@ -118,7 +112,6 @@ interface TasksViewProps {
   notes: Note[];
   toggleTaskCompletion: (id: string) => void;
   deleteTask: (id: string) => void;
-  // FIX: Updated prop type to reflect actual data structure.
   addTask: (task: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'status' | 'completed_at'>) => void;
   updateTask: (task: Task) => void;
 }
@@ -136,7 +129,6 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, 
         if ('id' in taskToSave && taskToSave.id) {
             updateTask(taskToSave as Task);
         } else {
-            // FIX: Properties 'dueDate', 'tags', 'projectId' do not exist.
             const { title, description, due_date, priority, tags, project_id } = taskToSave as Partial<Task>;
             addTask({ title: title || '', description, due_date, priority: priority || Priority.Medium, tags: tags || [], project_id });
         }
@@ -144,7 +136,6 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, 
     };
     
     const handleAddNewTask = () => {
-        // FIX: Object literal may only specify known properties. Use 'status' instead of 'isCompleted'.
         setEditingTask({
             title: '',
             description: '',
@@ -160,7 +151,6 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, 
     type EnrichedTask = Task & { project?: Project };
 
     const groupedTasks = useMemo(() => {
-        // FIX: Property 'projectId' does not exist on type 'Task'. Did you mean 'project_id'?
         const enrichedTasks: EnrichedTask[] = tasks.map(t => ({...t, project: t.project_id ? projectMap.get(t.project_id) : undefined}));
 
         if (viewMode === 'agenda') {
@@ -174,7 +164,6 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, 
             
             enrichedTasks.forEach(task => {
                 let category = 'noDate';
-                // FIX: Property 'dueDate' does not exist on type 'EnrichedTask'. Did you mean 'due_date'?
                 if (task.due_date) {
                     const taskDate = getStartOfDay(new Date(task.due_date));
                     if (taskDate.getTime() < today.getTime()) category = 'overdue';
@@ -182,7 +171,6 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, 
                     else if (taskDate.getTime() === tomorrow.getTime()) category = 'tomorrow';
                     else category = 'upcoming';
                 }
-                // FIX: Property 'isCompleted' does not exist on type 'EnrichedTask'.
                 if (task.status === 'done') {
                     groups[category].completed.push(task);
                 } else {
@@ -204,10 +192,8 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, 
              projects.forEach(p => groups[p.id] = { active: [], completed: [] });
              
              enrichedTasks.forEach(task => {
-                // FIX: Property 'projectId' does not exist on type 'EnrichedTask'. Did you mean 'project_id'?
                 const key = task.project_id || 'no-project';
                 if (!groups[key]) groups[key] = { active: [], completed: [] };
-                // FIX: Property 'isCompleted' does not exist on type 'EnrichedTask'.
                 if (task.status === 'done') {
                     groups[key].completed.push(task);
                 } else {
@@ -229,7 +215,6 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, 
             };
 
             enrichedTasks.forEach(task => {
-                // FIX: Property 'isCompleted' does not exist on type 'EnrichedTask'.
                 if (task.status === 'done') {
                     groups[task.priority].completed.push(task);
                 } else {
@@ -276,7 +261,6 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, 
                                 ))}
                             </div>
                             <CollapsibleSection title="انجام‌شده‌ها" count={group.completed.length}>
-                                {/* // FIX: Property 'createdAt' does not exist on type 'EnrichedTask'. Did you mean 'created_at'? */}
                                 {group.completed.sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).map(task => (
                                      <TaskCard key={task.id} task={task} onToggle={toggleTaskCompletion} onDelete={deleteTask} onEdit={setEditingTask} />
                                 ))}

@@ -4,6 +4,15 @@ import { Task } from '../types';
 type TaskInsert = Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'status' | 'completed_at'>;
 type TaskUpdate = Partial<Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at'>>;
 
+const triggerVectorization = (id: string, content: string) => {
+    // Fire-and-forget call to the edge function.
+    // We do NOT await this.
+    supabase.functions.invoke('vectorize', {
+        body: { type: 'task', id, content }
+    }).then(({ error }) => {
+        if (error) console.error("Vectorization failed:", error);
+    }).catch(err => console.error("Vectorization error:", err));
+};
 
 export const getTasks = async (): Promise<Task[]> => {
   const { data, error } = await supabase
@@ -16,12 +25,13 @@ export const getTasks = async (): Promise<Task[]> => {
 };
 
 export const createTask = async (task: TaskInsert): Promise<Task> => {
+  // Use the RPC we defined in SQL
   const rpcParams = {
     title: task.title,
     description: task.description || null,
     project_id: task.project_id || null,
     due_date: task.due_date || null,
-    priority: task.priority || 'متوسط',
+    priority: task.priority || 'medium',
     tags: task.tags || []
   };
 
@@ -30,9 +40,13 @@ export const createTask = async (task: TaskInsert): Promise<Task> => {
     .single();
 
   if (error) throw error;
-  // The RPC function returns the full task object, but we need to ensure the structure matches the client-side Type.
-  // The returned object from this specific RPC is already correct.
-  return data as Task;
+  
+  const createdTask = data as Task;
+
+  // Trigger background vectorization
+  triggerVectorization(createdTask.id, `${createdTask.title} ${createdTask.description || ''} ${createdTask.tags ? createdTask.tags.join(' ') : ''}`);
+
+  return createdTask;
 };
 
 
@@ -45,6 +59,13 @@ export const updateTask = async (id: string, updates: TaskUpdate) => {
     .single();
 
   if (error) throw error;
+
+  // Trigger re-vectorization if text content changed
+  if (updates.title || updates.description || updates.tags) {
+       const content = `${data.title} ${data.description || ''} ${data.tags ? data.tags.join(' ') : ''}`;
+       triggerVectorization(data.id, content);
+  }
+
   return data as Task;
 };
 

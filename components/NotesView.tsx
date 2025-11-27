@@ -75,7 +75,6 @@ const NoteCard: React.FC<{
                             </div>
                         )}
                     </div>
-                    {/* // FIX: Property 'createdAt' does not exist on type 'Note'. Did you mean 'created_at'? */}
                     <span>{new Date(note.created_at).toLocaleDateString('fa-IR')}</span>
                 </div>
             </div>
@@ -98,7 +97,6 @@ const NotesView: React.FC<{
     const projectMap = useMemo(() => new Map(projects.map(p => [p.id, p])), [projects]);
 
     const openModalForNew = () => {
-        // FIX: Object literal may only specify known properties, and 'projectId' does not exist...
         setCurrentNote({ title: '', content: '', tags: [], project_id: undefined });
     };
 
@@ -134,7 +132,6 @@ const NotesView: React.FC<{
         return notes.filter(note => 
             note.title.toLowerCase().includes(lowercasedQuery) ||
             (note.content && note.content.toLowerCase().includes(lowercasedQuery)) ||
-            // FIX: Property 'projectId' does not exist on type 'Note'. Did you mean 'project_id'?
             (projectMap.get(note.project_id || '')?.title.toLowerCase().includes(lowercasedQuery)) ||
             (note.tags && note.tags.some(tag => tag.toLowerCase().includes(lowercasedQuery)))
         );
@@ -164,7 +161,6 @@ const NotesView: React.FC<{
                 <NoteCard 
                     key={note.id} 
                     note={note} 
-                    // FIX: Property 'projectId' does not exist on type 'Note'. Did you mean 'project_id'?
                     project={note.project_id ? projectMap.get(note.project_id) : undefined}
                     onDelete={deleteNote} 
                     onEdit={openModalForEdit}

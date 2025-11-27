@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Page, Task, Note, ChatMessage, Habit, Project } from './types';
 import BottomNav from './components/BottomNav';
@@ -16,6 +17,8 @@ import * as projectService from './services/projectService';
 import * as taskService from './services/taskService';
 import * as noteService from './services/noteService';
 import * as habitService from './services/habitService';
+import TaskEditorModal from './components/TaskEditorModal';
+import NoteEditorModal from './components/NoteEditorModal';
 
 
 interface AppNotification {
@@ -73,6 +76,11 @@ const MainApp: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+
+  // Global Modals State
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+
 
   const { user } = useAuth();
 
@@ -153,14 +161,12 @@ const MainApp: React.FC = () => {
 
     const habitChanges = supabase.channel('habits-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'habits' },
         async () => {
-             // Habits are more complex due to completions, refetch all for simplicity
             const habitsData = await habitService.getHabits();
             setHabits(habitsData);
         }).subscribe();
         
     const habitCompletionChanges = supabase.channel('habit-completions-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'habit_completions' },
         async () => {
-            // Refetch habits when completions change
             const habitsData = await habitService.getHabits();
             setHabits(habitsData);
         }).subscribe();
@@ -278,12 +284,26 @@ const MainApp: React.FC = () => {
 
       try {
           await habitService.toggleHabitCompletion(habitId, date);
-          // On success, do nothing, UI is already updated.
       } catch (error) {
           addNotification("خطا در ثبت وضعیت عادت.", "error");
           setHabits(originalHabits); // Rollback on error
       }
   };
+
+  // --- Handlers for Chat to open modals ---
+  const handleEditTask = (task: Task) => setEditingTask(task);
+  const handleEditNote = (note: Note) => setEditingNote(note);
+  const handleSaveModalTask = (task: Task | Partial<Task>) => {
+      if ('id' in task && task.id) handleUpdateTask(task);
+      else handleAddTask(task as any);
+      setEditingTask(null);
+  }
+  const handleSaveModalNote = (note: Note | Partial<Note>) => {
+      if ('id' in note && note.id) handleUpdateNote(note);
+      else handleAddNote(note as any);
+      setEditingNote(null);
+  }
+
 
   const renderContent = () => {
     if (loadingData) {
@@ -323,6 +343,8 @@ const MainApp: React.FC = () => {
       case Page.Chat:
         return <ChatView 
             messages={chatMessages} setMessages={setChatMessages}
+            tasks={tasks} notes={notes} 
+            onEditTask={handleEditTask} onEditNote={handleEditNote}
         />;
       default:
         return <Dashboard 
@@ -341,6 +363,22 @@ const MainApp: React.FC = () => {
             </main>
             <ToastNotifications notifications={notifications} onRemove={removeNotification} />
             <BottomNav currentPage={currentPage} setPage={setCurrentPage} />
+            
+            {/* Global Modals triggered from Chat */}
+            {editingTask && (
+                <TaskEditorModal 
+                    isOpen={!!editingTask} task={editingTask} 
+                    projects={projects} notes={notes} 
+                    onClose={() => setEditingTask(null)} onSave={handleSaveModalTask} onDelete={handleDeleteTask} 
+                />
+            )}
+            {editingNote && (
+                <NoteEditorModal 
+                    isOpen={!!editingNote} note={editingNote} 
+                    projects={projects} tasks={tasks} allNotes={notes} 
+                    onClose={() => setEditingNote(null)} onSave={handleSaveModalNote} onDelete={handleDeleteNote} 
+                />
+            )}
        </div>
   );
 };

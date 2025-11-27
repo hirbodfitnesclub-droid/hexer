@@ -74,12 +74,9 @@ const TaskEditorModal: React.FC<TaskEditorModalProps> = ({ task, isOpen, project
                 <div className="p-4 sm:p-6 flex-shrink-0">
                     <div className="flex items-start gap-4">
                         <button
-                            // FIX: Property 'isCompleted' does not exist on type 'Task | Partial<Task>'. Use 'status' and 'completed_at'.
                             onClick={() => setFormState(s => ({ ...s, status: s.status === 'done' ? 'todo' : 'done', completed_at: s.completed_at ? null : new Date().toISOString() }))}
-                            // FIX: Property 'isCompleted' does not exist on type 'Task | Partial<Task>'.
                             className={`mt-1.5 w-6 h-6 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-all duration-300 ${formState.status === 'done' ? 'bg-sky-500 border-sky-400' : 'border-slate-600 hover:border-sky-500'}`}
                         >
-                            {/* // FIX: Property 'isCompleted' does not exist on type 'Task | Partial<Task>'. */}
                             {formState.status === 'done' && <CheckIcon className="w-4 h-4 text-white"/>}
                         </button>
                         <div className="flex-1">
@@ -108,7 +105,6 @@ const TaskEditorModal: React.FC<TaskEditorModalProps> = ({ task, isOpen, project
                 <div className="flex-1 overflow-y-auto">
                     <div className="p-4 sm:p-6 border-t border-slate-800/60 bg-slate-950/30 space-y-2">
                         <PropertyRow icon={<CalendarIcon className="w-5 h-5" />} label="تاریخ">
-                             {/* // FIX: Property 'dueDate' does not exist on type 'Task | Partial<Task>'. Did you mean 'due_date'? */}
                              <input type="date" value={formState.due_date?.split('T')[0] || ''} onChange={e => setFormState(s => ({...s, due_date: e.target.value}))} className="bg-slate-800/60 px-3 py-1.5 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 w-full text-sm font-medium"/>
                         </PropertyRow>
                          <PropertyRow icon={<FlagIcon className="w-5 h-5" />} label="اولویت">
@@ -120,7 +116,6 @@ const TaskEditorModal: React.FC<TaskEditorModalProps> = ({ task, isOpen, project
                         </PropertyRow>
                         <PropertyRow icon={<BriefcaseIcon className="w-5 h-5" />} label="پروژه">
                             <div className="relative">
-                                {/* // FIX: Property 'projectId' does not exist on type 'Task | Partial<Task>'. Did you mean 'project_id'? */}
                                 <select value={formState.project_id || ''} onChange={e => setFormState(s => ({...s, project_id: e.target.value || undefined}))} className="bg-slate-800/60 px-3 py-1.5 pr-8 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 w-full text-sm font-medium appearance-none cursor-pointer">
                                     <option value="" className="bg-slate-900">بدون پروژه</option>
                                     {projects.map(p => <option key={p.id} value={p.id} className="bg-slate-900">{p.title}</option>)}
