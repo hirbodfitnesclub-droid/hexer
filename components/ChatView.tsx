@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, ChatMode, Citation, Task, Note, ActionResult, Project, Page } from '../types';
-import { BotIcon, UserIcon, SendIcon, SparklesIcon, TargetIcon, LightbulbIcon, PencilIcon, NotebookIcon, ListChecksIcon, LinkIcon, CheckIcon, BriefcaseIcon, FlameIcon } from './icons';
+import { BotIcon, UserIcon, SendIcon, SparklesIcon, TargetIcon, LightbulbIcon, PencilIcon, NotebookIcon, ListChecksIcon, LinkIcon, CheckIcon, BriefcaseIcon, FlameIcon, PaperclipIcon, MicrophoneIcon, CalendarIcon, PlusIcon, XIcon, TrashIcon } from './icons';
 import { supabase } from '../services/supabaseClient';
 
 
@@ -18,141 +18,260 @@ interface ChatViewProps {
   onInjectResult: (result: ActionResult) => void;
 }
 
-const CitationCard: React.FC<{ citation: Citation, onClick: () => void }> = ({ citation, onClick }) => (
-    <button onClick={onClick} className="flex items-center gap-2 bg-gray-900/50 border border-white/5 rounded-lg p-2 text-xs text-gray-400 hover:bg-gray-800 hover:text-white hover:border-sky-500/30 transition-all cursor-pointer">
-        {citation.type === 'task' ? <ListChecksIcon className="w-3.5 h-3.5 text-sky-400" /> : <NotebookIcon className="w-3.5 h-3.5 text-purple-400" />}
-        <span className="truncate max-w-[150px]">{citation.title}</span>
-    </button>
-);
-
-const ActionResultCard: React.FC<{ result: ActionResult, onClick: () => void }> = ({ result, onClick }) => {
-    const isTask = result.type === 'task';
-    const isNote = result.type === 'note';
-    const isProject = result.type === 'project';
-    const isHabit = result.type === 'habit';
-    
-    // Determine Title
-    let title = '';
-    if (isTask) title = result.data.title;
-    else if (isNote) title = result.data.title;
-    else if (isProject) title = result.data.title;
-    else if (isHabit) title = result.data.name;
-
-    const isCreate = result.operation === 'create';
-
-    // Styling configuration based on type
-    let icon = <ListChecksIcon className="w-5 h-5"/>;
-    let bgColor = 'bg-blue-500/10 text-blue-400';
-    let label = 'تسک';
-    let borderColor = 'border-blue-500/20';
-
-    if (isTask) {
-        icon = <ListChecksIcon className="w-5 h-5"/>;
-        bgColor = isCreate ? 'bg-green-500/10 text-green-400' : 'bg-blue-500/10 text-blue-400';
-        label = 'تسک';
-        borderColor = isCreate ? 'border-green-500/20' : 'border-blue-500/20';
-    } else if (isNote) {
-        icon = <NotebookIcon className="w-5 h-5"/>;
-        bgColor = isCreate ? 'bg-purple-500/10 text-purple-400' : 'bg-blue-500/10 text-blue-400';
-        label = 'یادداشت';
-        borderColor = isCreate ? 'border-purple-500/20' : 'border-blue-500/20';
-    } else if (isProject) {
-        icon = <BriefcaseIcon className="w-5 h-5"/>;
-        bgColor = isCreate ? 'bg-sky-500/10 text-sky-400' : 'bg-blue-500/10 text-blue-400';
-        label = 'پروژه';
-        borderColor = isCreate ? 'border-sky-500/20' : 'border-blue-500/20';
-    } else if (isHabit) {
-        icon = <FlameIcon className="w-5 h-5"/>;
-        bgColor = isCreate ? 'bg-red-500/10 text-red-400' : 'bg-blue-500/10 text-blue-400';
-        label = 'عادت';
-        borderColor = isCreate ? 'border-red-500/20' : 'border-blue-500/20';
-    }
-
-    return (
-        <button onClick={onClick} className={`w-full mt-2 bg-gray-900/40 border ${borderColor} rounded-xl p-3 flex items-center gap-3 hover:bg-gray-900/80 transition-all text-right group`}>
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${bgColor}`}>
-                {icon}
-            </div>
-            <div className="flex-1 overflow-hidden">
-                <div className="flex items-center gap-2 text-xs text-gray-400 mb-0.5">
-                    {isCreate ? <span className="text-green-400 font-semibold">ساخته شد</span> : <span className="text-blue-400 font-semibold">بروزرسانی شد</span>}
-                    <span>•</span>
-                    <span>{label}</span>
-                </div>
-                <h4 className="font-semibold text-gray-200 truncate group-hover:text-white transition-colors">{title}</h4>
-            </div>
-            <div className="p-1.5 bg-gray-800 rounded-lg text-gray-500 group-hover:bg-sky-600 group-hover:text-white transition-all">
-                {isHabit ? <CheckIcon className="w-4 h-4" /> : <PencilIcon className="w-4 h-4" />}
-            </div>
-        </button>
-    )
-}
+const suggestions = [
+  { text: "برنامه امروزم چیه؟", icon: <CalendarIcon className="w-4 h-4 text-sky-400" /> },
+  { text: "یک تسک جدید بساز برای...", icon: <ListChecksIcon className="w-4 h-4 text-green-400" /> },
+  { text: "ایده‌های قبلیم رو مرور کن", icon: <LightbulbIcon className="w-4 h-4 text-yellow-400" /> },
+];
 
 const ChatView: React.FC<ChatViewProps> = ({ messages, setMessages, tasks, notes, projects, onEditTask, onEditNote, onEditProject, setPage, onInjectResult }) => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<ChatMode>('auto');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Voice Recording States
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  // Image Upload States
+  const [selectedImage, setSelectedImage] = useState<string | null>(null); // Base64 data URL
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  useEffect(scrollToBottom, [messages]);
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
-  const handleSendMessage = async () => {
-    if (input.trim() === '' || isLoading) return;
+  // --- Image Handling Logic ---
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+        const file = e.target.files[0];
+        if (!file.type.startsWith('image/')) {
+            alert('لطفا فقط فایل تصویری انتخاب کنید.');
+            return;
+        }
 
-    const userMessage: ChatMessage = { id: `msg-${Date.now()}`, sender: 'user', text: input, mode: mode };
-    const currentHistory = [...messages, userMessage];
-    setMessages(currentHistory);
-    
-    const messageToSend = input;
-    const currentMode = mode;
+        try {
+            const compressed = await compressImage(file);
+            setSelectedImage(compressed);
+            setRecordedAudio(null); // Clear audio if image selected (simplify UX)
+        } catch (err) {
+            console.error("Image processing failed", err);
+            alert("خطا در پردازش تصویر.");
+        }
+    }
+    // Reset input so same file can be selected again
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 1024; // Limit width to 1024px
+                const MAX_HEIGHT = 1024;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width *= MAX_HEIGHT / height;
+                        height = MAX_HEIGHT;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+                // Compress to JPEG at 70% quality
+                resolve(canvas.toDataURL('image/jpeg', 0.7)); 
+            };
+            img.onerror = reject;
+        };
+        reader.onerror = reject;
+    });
+  };
+
+  const removeImage = () => {
+      setSelectedImage(null);
+  };
+
+  // --- Voice Recording Logic ---
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setRecordedAudio(audioBlob);
+        
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setSelectedImage(null); // Clear image if recording starts
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+      alert("دسترسی به میکروفون امکان‌پذیر نیست.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const cancelRecording = () => {
+      setRecordedAudio(null);
+      setIsRecording(false);
+      audioChunksRef.current = [];
+  }
+
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error("Failed to convert blob to base64"));
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
+  const handleMicClick = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+  // -----------------------------
+
+  const handleSendMessage = async (textOverride?: string, audioData?: { data: string, mimeType: string }, imageData?: { data: string, mimeType: string }) => {
+    // Determine content to send
+    let textToSend = textOverride || input;
+    let finalAudioData = audioData;
+    let finalImageData = imageData;
+
+    // Handle Image from State if not passed explicitly
+    if (!finalImageData && selectedImage) {
+        const rawBase64 = selectedImage.split(',')[1];
+        const mimeType = selectedImage.split(';')[0].split(':')[1];
+        finalImageData = { data: rawBase64, mimeType };
+    }
+
+    // Handle Audio from State if not passed explicitly (and not sending via preview button which handles it)
+    // Note: Audio preview button calls handleSendMessage with explicit audioData
+
+    if ((!textToSend.trim() && !finalAudioData && !finalImageData) || isLoading) return;
+
+    const newMessage: ChatMessage = {
+      id: Date.now().toString(),
+      sender: 'user',
+      text: textToSend || (finalAudioData ? '[پیام صوتی]' : '[تصویر]'),
+    };
+
+    setMessages(prev => [...prev, newMessage]);
     setInput('');
+    setSelectedImage(null); // Clear image after send
+    setRecordedAudio(null); // Clear audio after send
     setIsLoading(true);
 
     try {
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
-        body: { message: messageToSend, history: currentHistory, mode: currentMode },
+        body: {
+          message: textToSend,
+          history: messages.slice(-10), // Send last 10 messages for context
+          mode: mode,
+          audio: finalAudioData, // Send audio if available
+          image: finalImageData // Send image if available
+        }
       });
 
-      if (error) {
-        throw new Error(error.message);
-      }
-      
-      // Inject result immediately into App state (Optimistic UI)
-      if (data.actionResult) {
-          onInjectResult(data.actionResult);
+      if (error) throw error;
+
+      if (data.error) {
+          throw new Error(data.error);
       }
 
       const aiMessage: ChatMessage = {
-        id: `msg-${Date.now()}-ai`,
+        id: (Date.now() + 1).toString(),
         sender: 'ai',
-        text: data.reply || "پاسخی دریافت نشد. لطفاً دوباره تلاش کنید.",
-        mode: currentMode,
-        citations: data.citations, // Capture citations from backend
-        actionResult: data.actionResult // Capture action result
+        text: data.reply,
+        citations: data.citations,
+        actionResults: data.actionResults // Updated to accept array
       };
-      setMessages(prev => [...prev, aiMessage]);
 
-    } catch (err: any) {
-      const errorMessage: ChatMessage = {
-        id: `msg-${Date.now()}-ai-error`,
+      setMessages(prev => [...prev, aiMessage]);
+      
+      // Inject the action results immediately into the App state (Optimistic UI)
+      if (data.actionResults && Array.isArray(data.actionResults)) {
+          data.actionResults.forEach((result: ActionResult) => onInjectResult(result));
+      }
+
+    } catch (error: any) {
+      console.error('Error sending message:', error);
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
         sender: 'ai',
-        text: `متاسفانه مشکلی در ارتباط با دستیار پیش آمد: ${err.message}`,
-      };
-      setMessages(prev => [...prev, errorMessage]);
+        text: 'متاسفانه مشکلی در پردازش درخواست پیش آمد. لطفاً دوباره تلاش کنید.'
+      }]);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const processAndSendAudio = async () => {
+    if (!recordedAudio) return;
+    try {
+      const base64Data = await blobToBase64(recordedAudio);
+      const rawBase64 = base64Data.split(',')[1];
+      handleSendMessage("[پیام صوتی]", { data: rawBase64, mimeType: 'audio/webm' });
+    } catch (error) {
+      console.error("Error processing audio:", error);
+    }
+  };
+
+  // --- Handlers for Interactive Elements ---
   const handleCitationClick = (citation: Citation) => {
       if (citation.type === 'task') {
           const task = tasks.find(t => t.id === citation.id);
           if (task) onEditTask(task);
-      } else {
+      } else if (citation.type === 'note') {
           const note = notes.find(n => n.id === citation.id);
           if (note) onEditNote(note);
       }
@@ -160,126 +279,291 @@ const ChatView: React.FC<ChatViewProps> = ({ messages, setMessages, tasks, notes
 
   const handleActionResultClick = (result: ActionResult) => {
       if (result.type === 'task') {
-          const task = tasks.find(t => t.id === result.data.id) || result.data;
-          onEditTask(task);
+          onEditTask(result.data as Task);
       } else if (result.type === 'note') {
-           const note = notes.find(n => n.id === result.data.id) || result.data;
-           onEditNote(note);
+          onEditNote(result.data as Note);
       } else if (result.type === 'project') {
-           // We might not have the full project in the list yet due to latency, 
-           // but passing result.data (which is the created project) is safe.
-           onEditProject(result.data);
+          onEditProject(result.data as Project);
       } else if (result.type === 'habit') {
-           // Habits don't have a modal, redirect to Dashboard where habits live.
            setPage(Page.Dashboard);
       }
   };
 
+
+  // --- Render Helpers ---
   const ModeChip: React.FC<{ m: ChatMode, label: string, icon: React.ReactNode }> = ({ m, label, icon }) => (
+    <button
+      onClick={() => setMode(m)}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+        mode === m 
+          ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/25 ring-2 ring-sky-400/50' 
+          : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
+      }`}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+
+  const CitationCard: React.FC<{ citation: Citation }> = ({ citation }) => (
       <button 
-        onClick={() => setMode(m)}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 border ${
-            mode === m 
-            ? 'bg-sky-500 text-white border-sky-400 shadow-lg shadow-sky-500/20' 
-            : 'bg-gray-800 text-gray-400 border-gray-700 hover:border-gray-500'
-        }`}
+        onClick={() => handleCitationClick(citation)}
+        className="flex items-center gap-2 bg-gray-800/50 hover:bg-gray-700/80 border border-white/5 hover:border-sky-500/30 rounded-lg p-2 transition-all group text-right w-full sm:w-auto"
       >
-          {icon}
-          <span>{label}</span>
+          <div className={`p-1.5 rounded-md ${citation.type === 'task' ? 'bg-green-500/10 text-green-400' : 'bg-purple-500/10 text-purple-400'}`}>
+              {citation.type === 'task' ? <ListChecksIcon className="w-3.5 h-3.5"/> : <NotebookIcon className="w-3.5 h-3.5"/>}
+          </div>
+          <div className="flex-1 min-w-0">
+              <p className="text-xs text-gray-300 truncate max-w-[150px]">{citation.title}</p>
+              <p className="text-[10px] text-gray-500">منبع مرتبط</p>
+          </div>
+          <LinkIcon className="w-3 h-3 text-gray-600 group-hover:text-sky-400 transition-colors" />
       </button>
   );
-  
+
+  const ActionResultCard: React.FC<{ result: ActionResult }> = ({ result }) => {
+      let icon = <CheckIcon className="w-5 h-5"/>;
+      let color = "bg-green-500";
+      let label = "آیتم ساخته شد";
+      let title = "";
+
+      if (result.type === 'task') {
+          icon = <ListChecksIcon className="w-5 h-5 text-white"/>;
+          color = "bg-green-500";
+          label = "تسک جدید";
+          title = (result.data as Task).title;
+      } else if (result.type === 'note') {
+          icon = <NotebookIcon className="w-5 h-5 text-white"/>;
+          color = "bg-purple-500";
+          label = "یادداشت جدید";
+          title = (result.data as Note).title;
+      } else if (result.type === 'project') {
+          icon = <BriefcaseIcon className="w-5 h-5 text-white"/>;
+          color = "bg-sky-500";
+          label = "پروژه جدید";
+          title = (result.data as Project).title;
+      } else if (result.type === 'habit') {
+          icon = <FlameIcon className="w-5 h-5 text-white"/>;
+          color = "bg-orange-500";
+          label = "عادت جدید";
+          title = (result.data as any).name;
+      }
+
+      return (
+          <div className="mt-3 flex">
+              <button 
+                onClick={() => handleActionResultClick(result)}
+                className="flex items-center gap-3 bg-gray-800/80 border border-white/10 p-3 rounded-xl hover:bg-gray-700 transition-all group w-full sm:w-auto min-w-[200px]"
+              >
+                  <div className={`w-10 h-10 rounded-lg ${color} flex items-center justify-center shadow-lg shadow-black/20`}>
+                      {icon}
+                  </div>
+                  <div className="text-right flex-1">
+                      <p className="text-xs text-gray-400 font-medium mb-0.5">{label}</p>
+                      <p className="text-sm text-white font-bold group-hover:text-sky-300 transition-colors">{title}</p>
+                  </div>
+                  <div className="p-1.5 bg-white/5 rounded-full group-hover:bg-white/10 transition-colors">
+                      <LinkIcon className="w-4 h-4 text-gray-400 group-hover:text-white" />
+                  </div>
+              </button>
+          </div>
+      );
+  };
+
   return (
     <div className="flex flex-col h-full bg-gray-950">
-        <header className="flex-shrink-0 p-4 border-b border-gray-700/50 bg-gray-900/50 backdrop-blur-md">
-            <h1 className="text-xl font-bold text-white mb-3">چت با دستیار هوشمند</h1>
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-                <ModeChip m="auto" label="خودکار" icon={<SparklesIcon className="w-3.5 h-3.5" />} />
-                <ModeChip m="action" label="دستور (ساخت/ویرایش)" icon={<PencilIcon className="w-3.5 h-3.5" />} />
-                <ModeChip m="memory" label="حافظه (جستجو/تحلیل)" icon={<LightbulbIcon className="w-3.5 h-3.5" />} />
+      {/* Header */}
+      <div className="p-4 border-b border-white/10 flex flex-col gap-3 bg-gray-950/80 backdrop-blur-md sticky top-0 z-10">
+        <div className="flex justify-between items-center">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <BotIcon className="w-6 h-6 text-sky-400" />
+            دستیار هوشمند
+            </h2>
+             <div className="flex gap-2">
+                <ModeChip m="auto" label="خودکار" icon={<SparklesIcon className="w-3.5 h-3.5"/>} />
+                <ModeChip m="action" label="دستور" icon={<TargetIcon className="w-3.5 h-3.5"/>} />
+                <ModeChip m="memory" label="حافظه" icon={<LightbulbIcon className="w-3.5 h-3.5"/>} />
             </div>
-        </header>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
-            {messages.map((msg) => (
-            <div key={msg.id} className={`flex items-start gap-3 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                {msg.sender === 'ai' && <div className="w-8 h-8 rounded-full bg-sky-500/20 flex items-center justify-center text-sky-300 flex-shrink-0"><BotIcon className="w-5 h-5" /></div>}
-                <div className={`flex flex-col gap-2 max-w-md lg:max-w-lg ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
-                    <div className={`px-4 py-3 rounded-2xl ${msg.sender === 'user' ? 'bg-fuchsia-600 text-white rounded-br-none' : 'bg-gray-800 border border-gray-700 text-gray-200 rounded-bl-none'}`}>
-                    {msg.sender === 'ai' && msg.mode === 'memory' && (
-                        <div className="flex items-center gap-1 text-xs text-sky-300 mb-2 border-b border-white/10 pb-1">
-                            <LightbulbIcon className="w-3 h-3" />
-                            <span>پاسخ بر اساس حافظه</span>
-                        </div>
-                    )}
-                    <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                    
-                     {/* Action Result Card */}
-                     {msg.actionResult && (
-                         <ActionResultCard result={msg.actionResult} onClick={() => handleActionResultClick(msg.actionResult!)} />
-                     )}
-                    </div>
-                    
-                    {/* Render Citations */}
-                    {msg.citations && msg.citations.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-1 px-1">
-                            {msg.citations.map(citation => (
-                                <CitationCard key={citation.id} citation={citation} onClick={() => handleCitationClick(citation)} />
-                            ))}
-                        </div>
-                    )}
-                </div>
-                {msg.sender === 'user' && <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-300 flex-shrink-0"><UserIcon className="w-5 h-5"/></div>}
-            </div>
-            ))}
-            
-            {isLoading && (
-                 <div className="flex items-start gap-3 justify-start">
-                     <div className="w-8 h-8 rounded-full bg-sky-500/20 flex items-center justify-center text-sky-300 flex-shrink-0"><SparklesIcon className="w-5 h-5 animate-pulse" /></div>
-                     <div className="max-w-xs md:max-w-md px-4 py-3 rounded-2xl bg-gray-800 border border-gray-700 text-gray-200 rounded-bl-none">
-                        <div className="flex items-center gap-2 text-sm text-gray-400">
-                           {mode === 'memory' ? (
-                               <span className="text-xs animate-pulse">در حال جستجو در حافظه...</span>
-                           ) : mode === 'action' ? (
-                               <span className="text-xs animate-pulse">در حال پردازش دستور...</span>
-                           ) : (
-                               <div className="flex gap-1">
-                                   <div className="w-1.5 h-1.5 bg-sky-400 rounded-full animate-bounce"></div>
-                                   <div className="w-1.5 h-1.5 bg-sky-400 rounded-full animate-bounce delay-100"></div>
-                                   <div className="w-1.5 h-1.5 bg-sky-400 rounded-full animate-bounce delay-200"></div>
-                               </div>
-                           )}
-                        </div>
-                     </div>
-                 </div>
-            )}
-            <div ref={messagesEndRef} />
         </div>
+      </div>
 
-        <div className="flex-shrink-0 p-4 border-t border-gray-700/50 bg-gray-950">
-            <div className="flex items-center bg-gray-800 rounded-2xl p-1 border border-gray-700 focus-within:border-sky-500/50 transition-colors">
-                <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                    placeholder={
-                        mode === 'action' ? 'مثال: تسک خرید نان را بساز...' :
-                        mode === 'memory' ? 'مثال: آیا قبلا ایده‌ای درباره سفر داشتم؟...' :
-                        'پیام خود را بنویسید...'
-                    }
-                    className="w-full bg-transparent p-3 text-white placeholder-gray-500 focus:outline-none"
-                    disabled={isLoading}
-                />
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        {messages.length === 1 && (
+            <div className="flex flex-col items-center justify-center py-10 opacity-0 animate-fade-in-up" style={{animationDelay: '0.2s', opacity: 1}}>
+                 <div className="w-20 h-20 bg-gray-800 rounded-full flex items-center justify-center mb-6 relative">
+                    <div className="absolute inset-0 bg-sky-500/20 rounded-full animate-pulse"></div>
+                    <BotIcon className="w-10 h-10 text-sky-400" />
+                 </div>
+                 <h3 className="text-xl font-bold text-white mb-2">چطور می‌تونم کمکت کنم؟</h3>
+                 <p className="text-gray-400 text-sm mb-8 text-center max-w-xs">من می‌تونم کارهات رو مدیریت کنم، یادداشت بردارم و از حافظه‌ام برای جواب دادن به سوالاتت استفاده کنم.</p>
+                 
+                 <div className="grid grid-cols-1 gap-3 w-full max-w-sm">
+                    {suggestions.map((s, i) => (
+                        <button 
+                            key={i}
+                            onClick={() => handleSendMessage(s.text)}
+                            className="flex items-center gap-3 p-3 bg-gray-900 border border-gray-800 rounded-xl hover:border-sky-500/50 hover:bg-gray-800 transition-all text-right group"
+                        >
+                            <div className="p-2 bg-gray-800 rounded-lg group-hover:bg-gray-700 transition-colors">{s.icon}</div>
+                            <span className="text-sm text-gray-300 group-hover:text-white">{s.text}</span>
+                        </button>
+                    ))}
+                 </div>
+            </div>
+        )}
+
+        {messages.slice(1).map((msg) => (
+          <div
+            key={msg.id}
+            className={`flex items-start gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : ''} animate-fade-in-up`}
+          >
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.sender === 'user' ? 'bg-indigo-600' : 'bg-sky-600'}`}>
+              {msg.sender === 'user' ? <UserIcon className="w-5 h-5 text-white" /> : <BotIcon className="w-5 h-5 text-white" />}
+            </div>
+            
+            <div className={`flex flex-col gap-2 max-w-[85%] ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
+                <div className={`p-3.5 rounded-2xl text-sm leading-6 ${
+                  msg.sender === 'user' 
+                    ? 'bg-indigo-600 text-white rounded-tl-none' 
+                    : 'bg-gray-800 text-gray-100 rounded-tr-none border border-white/5'
+                }`}>
+                  {msg.text}
+                </div>
+                
+                {/* Citations (Sources) */}
+                {msg.citations && msg.citations.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-1">
+                        {msg.citations.map((citation, idx) => (
+                            <CitationCard key={idx} citation={citation} />
+                        ))}
+                    </div>
+                )}
+
+                {/* Action Results (Created Items) */}
+                {msg.actionResults && msg.actionResults.length > 0 && (
+                    <div className="flex flex-col gap-1 w-full">
+                        {msg.actionResults.map((result, idx) => (
+                            <ActionResultCard key={idx} result={result} />
+                        ))}
+                    </div>
+                )}
+            </div>
+          </div>
+        ))}
+        
+        {isLoading && (
+          <div className="flex items-start gap-3">
+             <div className="w-8 h-8 rounded-full bg-sky-600 flex items-center justify-center flex-shrink-0">
+               <BotIcon className="w-5 h-5 text-white" />
+            </div>
+            <div className="bg-gray-800 p-3 rounded-2xl rounded-tr-none border border-white/5 flex items-center gap-2">
+                 <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
+                 <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                 <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input Area */}
+      <div className="p-4 bg-gray-950 border-t border-white/10">
+        <input 
+            type="file" 
+            ref={fileInputRef} 
+            className="hidden" 
+            accept="image/*" 
+            onChange={handleFileSelect}
+        />
+
+        {/* Image Preview UI */}
+        {selectedImage && (
+            <div className="mb-2 relative inline-block">
+                <img src={selectedImage} alt="Selected" className="h-20 w-auto rounded-lg border border-white/20" />
                 <button 
-                    onClick={handleSendMessage} 
-                    disabled={isLoading || input.trim() === ''}
-                    className="p-3 bg-sky-500 rounded-xl text-white disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+                    onClick={removeImage}
+                    className="absolute -top-2 -left-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
                 >
-                    <SendIcon className="w-5 h-5" />
+                    <XIcon className="w-3 h-3" />
                 </button>
             </div>
+        )}
+
+        <div className={`relative flex items-center bg-gray-900 border transition-colors rounded-2xl p-1.5 ${isRecording ? 'border-red-500/50 bg-red-500/5' : 'border-gray-800 focus-within:border-sky-500/50'}`}>
+            
+            {recordedAudio ? (
+                // Audio Preview Mode
+                <div className="flex items-center gap-2 w-full px-2 py-1">
+                    <button 
+                        onClick={cancelRecording} 
+                        className="p-2 text-red-400 hover:bg-red-500/10 rounded-full transition-colors"
+                        title="حذف صدا"
+                    >
+                        <TrashIcon className="w-5 h-5"/>
+                    </button>
+                    <audio 
+                        src={URL.createObjectURL(recordedAudio)} 
+                        controls 
+                        className="flex-1 h-8"
+                    />
+                    <button
+                        onClick={processAndSendAudio}
+                        disabled={isLoading}
+                        className="p-2.5 bg-green-600 text-white rounded-xl hover:bg-green-500 transition-colors shadow-lg shadow-green-900/20"
+                        title="ارسال پیام صوتی"
+                    >
+                        <SendIcon className="w-5 h-5" />
+                    </button>
+                </div>
+            ) : (
+                // Text Input Mode (supports text + image)
+                <>
+                    <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-2.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-xl transition-colors disabled:opacity-50"
+                        disabled={isLoading || isRecording}
+                    >
+                        <PaperclipIcon className="w-5 h-5" />
+                    </button>
+                    
+                    <input
+                        type="text"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                        placeholder={isRecording ? "در حال ضبط..." : selectedImage ? "توضیحاتی برای تصویر بنویسید..." : "پیامی بنویسید..."}
+                        className="flex-1 bg-transparent text-white placeholder-gray-500 px-3 py-2 focus:outline-none disabled:opacity-50"
+                        disabled={isLoading || isRecording}
+                    />
+                    
+                    {input.trim() || selectedImage ? (
+                        <button
+                            onClick={() => handleSendMessage()}
+                            disabled={isLoading}
+                            className="p-2.5 bg-sky-600 text-white rounded-xl hover:bg-sky-500 transition-colors shadow-lg shadow-sky-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <SendIcon className="w-5 h-5" />
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleMicClick}
+                            className={`p-2.5 rounded-xl transition-all duration-300 ${
+                                isRecording 
+                                ? 'bg-red-500 text-white shadow-lg shadow-red-500/30 animate-pulse' 
+                                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                            }`}
+                        >
+                            {isRecording ? <div className="w-5 h-5 flex items-center justify-center"><div className="w-2.5 h-2.5 bg-white rounded-sm"></div></div> : <MicrophoneIcon className="w-5 h-5" />}
+                        </button>
+                    )}
+                </>
+            )}
         </div>
+        <p className="text-center text-[10px] text-gray-600 mt-2">
+            دستیار هوشمند ممکن است اشتباه کند. اطلاعات مهم را بررسی کنید.
+        </p>
+      </div>
     </div>
   );
 };

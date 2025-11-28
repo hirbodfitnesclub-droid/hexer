@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Project, Priority, Task, Note } from '../types';
 import { PlusIcon, TrashIcon, BriefcaseIcon, PencilIcon, XIcon, ListChecksIcon, NotebookIcon, LayoutGridIcon, ChevronDownIcon } from './icons';
@@ -285,9 +286,14 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, tasks, notes, add
                 })}
             </div>
         ) : (
-            <div className="text-center py-16">
+            <div className="text-center py-16 flex flex-col items-center">
                 <BriefcaseIcon className="w-16 h-16 mx-auto text-gray-700 mb-4" />
-                <p className="text-gray-500">هنوز پروژه‌ای نساخته‌ای.</p>
+                <h3 className="text-lg font-semibold text-gray-400">اولین پروژه خود را شروع کنید</h3>
+                <p className="text-gray-500 mt-2 max-w-sm">پروژه‌ها به شما کمک می‌کنند تا کارهای بزرگ و مرتبط را در یک مکان سازماندهی کنید.</p>
+                 <button onClick={openAddModal} className="mt-6 flex items-center gap-2 px-5 py-2.5 bg-sky-600 rounded-lg text-white font-semibold hover:bg-sky-700 transition-colors shadow-lg shadow-sky-900/40">
+                    <PlusIcon className="w-5 h-5" />
+                    <span>ساخت اولین پروژه</span>
+                </button>
             </div>
       )}
 

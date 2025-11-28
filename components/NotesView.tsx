@@ -171,11 +171,17 @@ const NotesView: React.FC<{
         <div className="text-center py-20 flex flex-col items-center">
             <NotebookIcon className="w-16 h-16 text-gray-700 mb-4" />
             <h3 className="text-lg font-semibold text-gray-400">
-                {searchQuery ? 'نتیجه‌ای یافت نشد' : 'هنوز یادداشتی ثبت نکرده‌اید'}
+                {searchQuery ? 'نتیجه‌ای یافت نشد' : 'فضایی برای ایده‌های بزرگ شما!'}
             </h3>
-            <p className="text-gray-500 mt-1">
-                {searchQuery ? 'عبارت جستجوی خود را تغییر دهید.' : 'برای شروع، دکمه + را بزنید.'}
+            <p className="text-gray-500 mt-2 max-w-sm">
+                {searchQuery ? 'عبارت جستجوی خود را تغییر دهید یا فیلترها را پاک کنید.' : 'یادداشت‌ها بهترین مکان برای ثبت افکار، ایده‌ها و اطلاعات مهم هستند. اولین یادداشت خود را بسازید.'}
             </p>
+             {!searchQuery && (
+                <button onClick={openModalForNew} className="mt-6 flex items-center gap-2 px-5 py-2.5 bg-purple-600 rounded-lg text-white font-semibold hover:bg-purple-700 transition-colors shadow-lg shadow-purple-900/40">
+                    <PlusIcon className="w-5 h-5" />
+                    <span>ساخت اولین یادداشت</span>
+                </button>
+            )}
         </div>
       )}
       

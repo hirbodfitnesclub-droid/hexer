@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Task, Priority, Project, Note } from '../types';
 import { PlusIcon, TrashIcon, ChevronDownIcon, ListChecksIcon, CalendarIcon, BriefcaseIcon, FlagIcon, LinkIcon } from './icons';
@@ -271,8 +272,8 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, 
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 pt-16">
                         <ListChecksIcon className="w-16 h-16 text-gray-700 mb-4" />
-                        <p className="font-semibold">همه کارها انجام شده!</p>
-                        <p className="text-sm">برای افزودن کار جدید، دکمه + را بزنید.</p>
+                        <h3 className="text-lg font-semibold text-gray-300">🎉 عالیه! همه کارها انجام شده.</h3>
+                        <p className="text-sm text-gray-500 mt-1">برای افزودن کار جدید، دکمه + پایین صفحه را بزنید.</p>
                     </div>
                 )}
             </div>

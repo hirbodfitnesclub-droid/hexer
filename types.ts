@@ -76,7 +76,7 @@ export interface ChatMessage {
   text: string;
   mode?: ChatMode; // To track which mode generated this message
   citations?: Citation[]; // Sources used for the response
-  actionResult?: ActionResult; // The item created/updated by the AI
+  actionResults?: ActionResult[]; // The items created/updated by the AI (Array support)
 }
 
 export enum Page {
