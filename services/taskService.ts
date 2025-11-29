@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { Task } from '../types';
 
@@ -51,9 +52,13 @@ export const createTask = async (task: TaskInsert): Promise<Task> => {
 
 
 export const updateTask = async (id: string, updates: TaskUpdate) => {
+  // SANITIZATION: Remove UI-only fields (like 'project' object joined for display) 
+  // before sending to DB to avoid "column does not exist" errors.
+  const { project, ...cleanUpdates } = updates as any;
+
   const { data, error } = await supabase
     .from('tasks')
-    .update(updates)
+    .update(cleanUpdates)
     .eq('id', id)
     .select()
     .single();
