@@ -1,7 +1,9 @@
+
 import React, { useState, useMemo } from 'react';
 import { Note, Project, Task } from '../types';
 import { TrashIcon, NotebookIcon, SearchIcon, PlusIcon, PencilIcon, LightbulbIcon, PinIcon, BookmarkIcon, TagIcon, LinkIcon } from './icons';
 import NoteEditorModal from './NoteEditorModal';
+import { formatPersianDate } from '../utils/dateUtils';
 
 // --- Helper Data & Functions ---
 const projectColorText: { [key: string]: string } = {
@@ -75,7 +77,7 @@ const NoteCard: React.FC<{
                             </div>
                         )}
                     </div>
-                    <span>{new Date(note.created_at).toLocaleDateString('fa-IR')}</span>
+                    <span>{formatPersianDate(note.created_at)}</span>
                 </div>
             </div>
         </div>

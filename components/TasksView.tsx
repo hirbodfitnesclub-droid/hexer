@@ -1,9 +1,9 @@
 
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Task, Priority, Project, Note } from '../types';
-import { PlusIcon, TrashIcon, ChevronDownIcon, ListChecksIcon, CalendarIcon, BriefcaseIcon, FlagIcon, LinkIcon } from './icons';
+import { PlusIcon, TrashIcon, ChevronDownIcon, ListChecksIcon, CalendarIcon, BriefcaseIcon, FlagIcon, LinkIcon, SearchIcon, XIcon } from './icons';
 import TaskEditorModal from './TaskEditorModal';
+import { formatPersianDate } from '../utils/dateUtils';
 
 // --- Helper Functions & Constants ---
 const getStartOfDay = (date: Date) => {
@@ -73,7 +73,7 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, onToggle, onDelete
                         </div>
                     )}
                     {task.due_date && (
-                        <span>{new Date(task.due_date).toLocaleDateString('fa-IR', { month: 'short', day: 'numeric' })}</span>
+                        <span>{formatPersianDate(task.due_date)}</span>
                     )}
                 </div>
                  <div className="absolute top-2 left-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
@@ -121,6 +121,7 @@ interface TasksViewProps {
 const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, updateTask, toggleTaskCompletion, deleteTask }) => {
     const [viewMode, setViewMode] = useState<ViewMode>('agenda');
     const [editingTask, setEditingTask] = useState<Task | Partial<Task> | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const handleSaveTask = (taskToSave: Task | Partial<Task>) => {
         if (!taskToSave.title?.trim()) {
@@ -152,8 +153,18 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, 
     
     type EnrichedTask = Task & { project?: Project };
 
+    const filteredTasks = useMemo(() => {
+        if (!searchQuery.trim()) return tasks;
+        const query = searchQuery.toLowerCase();
+        return tasks.filter(t => 
+            t.title.toLowerCase().includes(query) ||
+            (t.description && t.description.toLowerCase().includes(query)) ||
+            (t.project_id && projectMap.get(t.project_id)?.title.toLowerCase().includes(query))
+        );
+    }, [tasks, searchQuery, projectMap]);
+
     const groupedTasks = useMemo(() => {
-        const enrichedTasks: EnrichedTask[] = tasks.map(t => ({...t, project: t.project_id ? projectMap.get(t.project_id) : undefined}));
+        const enrichedTasks: EnrichedTask[] = filteredTasks.map(t => ({...t, project: t.project_id ? projectMap.get(t.project_id) : undefined}));
 
         if (viewMode === 'agenda') {
             const groups: Record<string, { active: EnrichedTask[], completed: EnrichedTask[] }> = { 
@@ -232,7 +243,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, 
         }
         return [];
 
-    }, [tasks, projectMap, viewMode, projects]);
+    }, [filteredTasks, projectMap, viewMode, projects]);
 
     const ViewModeButton: React.FC<{mode: ViewMode, label: string, icon: React.ReactNode}> = ({mode, label, icon}) => (
         <button onClick={() => setViewMode(mode)} className={`flex items-center justify-center gap-2 p-2 rounded-lg transition-colors w-full ${viewMode === mode ? 'bg-sky-500/20 text-sky-300' : 'text-gray-500 hover:bg-gray-800 hover:text-white'}`}>
@@ -243,8 +254,30 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, 
     
     return (
         <div className="flex flex-col h-full">
-            <header className="p-4 pt-8 sticky top-0 bg-gray-950/80 backdrop-blur-md z-10 border-b border-white/10">
-                <h1 className="text-3xl font-bold text-white mb-4">کارها</h1>
+            <header className="p-4 pt-8 sticky top-0 bg-gray-950/80 backdrop-blur-md z-10 border-b border-white/10 space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <h1 className="text-3xl font-bold text-white">کارها</h1>
+                    <div className="relative w-full md:max-w-xs">
+                        <input 
+                            type="text"
+                            placeholder="جستجو در کارها..."
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            className="w-full bg-gray-800/70 border border-white/10 rounded-xl py-2 pr-10 pl-8 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm"
+                        />
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+                            <SearchIcon className="w-4 h-4" />
+                        </div>
+                        {searchQuery && (
+                            <button 
+                                onClick={() => setSearchQuery('')}
+                                className="absolute inset-y-0 left-0 flex items-center pl-2 text-gray-500 hover:text-white"
+                            >
+                                <XIcon className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+                </div>
                 <div className="p-1 bg-gray-900/50 rounded-xl grid grid-cols-3 gap-1">
                     <ViewModeButton mode="agenda" label="دستور کار" icon={<CalendarIcon className="w-5 h-5"/>} />
                     <ViewModeButton mode="project" label="پروژه" icon={<BriefcaseIcon className="w-5 h-5"/>} />
@@ -272,8 +305,17 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, 
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 pt-16">
                         <ListChecksIcon className="w-16 h-16 text-gray-700 mb-4" />
-                        <h3 className="text-lg font-semibold text-gray-300">🎉 عالیه! همه کارها انجام شده.</h3>
-                        <p className="text-sm text-gray-500 mt-1">برای افزودن کار جدید، دکمه + پایین صفحه را بزنید.</p>
+                        <h3 className="text-lg font-semibold text-gray-300">
+                            {searchQuery ? 'نتیجه‌ای یافت نشد' : '🎉 عالیه! همه کارها انجام شده.'}
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                            {searchQuery ? 'عبارت دیگری را امتحان کنید.' : 'برای افزودن کار جدید، دکمه + پایین صفحه را بزنید.'}
+                        </p>
+                        {searchQuery && (
+                            <button onClick={() => setSearchQuery('')} className="mt-4 text-sky-400 hover:text-sky-300 text-sm font-semibold">
+                                پاک کردن جستجو
+                            </button>
+                        )}
                     </div>
                 )}
             </div>

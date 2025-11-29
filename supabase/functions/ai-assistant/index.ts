@@ -88,23 +88,34 @@ Deno.serve(async (req) => {
     const today = new Date();
     const todayStr = today.toLocaleDateString('en-CA'); // YYYY-MM-DD format
     const dayName = today.toLocaleDateString('fa-IR', { weekday: 'long' });
+    const persianDate = new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    }).format(today);
 
     const systemPrompt = `
     You are an intelligent Persian AI assistant.
     Current Mode: ${mode.toUpperCase()}
-    Today's Date: ${todayStr} (${dayName})
+    Today's Gregorian Date: ${todayStr} (${dayName})
+    Today's Persian Date: ${persianDate}
 
     **INSTRUCTIONS:**
-    1. **Transcribe/OCR First:** 
-       - If AUDIO is present: Write EXACTLY what you hear.
-       - If IMAGE is present: Perform OCR. Read the text visible in the image. Describe the visual context briefly if relevant.
-       - Store this in the 'transcription' field.
-    2. **Analyze:** Based on the transcription (or text), identify ALL user intents.
-       - If analysing a SCREENSHOT (e.g., chat app, notes app): Ignore UI elements (battery, time, back buttons). Focus on the *content* of the messages or notes. Extract actionable items.
+    1. **Transcribe/OCR First (CRITICAL):** 
+       - If AUDIO is present: Write EXACTLY what you hear. Capture the exact spoken words.
+       - If IMAGE is present: Perform **STRICT OCR**. Write down the text **EXACTLY** as it appears in the image. 
+         * **DO NOT TRANSLATE** specific terms (e.g., if image says "رپورتاژ", write "رپورتاژ", DO NOT write "report" or "reportz").
+         * **DO NOT SUMMARIZE** text in this step. Copy it.
+       - Store this raw text in the 'transcription' field.
+    2. **Analyze:** Based on the transcription, identify ALL user intents.
+       - If analysing a SCREENSHOT (e.g., chat app): Ignore UI elements (battery, time). Focus on the *content* of the messages.
     3. **Decompose:** Break complex requests into a list of actions.
        - "Buy milk and remind me to call Ali" -> 2 actions: CREATE_TASK("Buy milk"), CREATE_TASK("Call Ali").
-    4. **Dates:** Convert relative dates (tomorrow, next friday) to YYYY-MM-DD using Today's Date.
-    5. **Clean Titles:** If a date is extracted to 'dueDate', DO NOT include the time word in the 'title'.
+    4. **Dates:** Convert relative dates (tomorrow, next friday) to YYYY-MM-DD using Today's Gregorian Date.
+       - Understand Persian relative dates like "پنجم برج بعد" using Today's Persian Date as reference.
+    5. **Clean Titles:** 
+       - If a date is extracted to 'dueDate', DO NOT include the time word in the 'title'.
+       - Use the exact Persian terminology found in the transcription/OCR.
     6. **Response Format:** You MUST return a VALID JSON object (no markdown, no code blocks) with this exact structure:
 
     {

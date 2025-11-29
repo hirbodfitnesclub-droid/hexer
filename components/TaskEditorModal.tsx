@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Task, Priority, Project, Note } from '../types';
 import { XIcon, TrashIcon, CheckIcon, CalendarIcon, FlagIcon, BriefcaseIcon, NotebookIcon, ChevronDownIcon } from './icons';
+import PersianDatePicker from './PersianDatePicker';
 
 interface TaskEditorModalProps {
   task: Task | Partial<Task>;
@@ -106,7 +107,10 @@ const TaskEditorModal: React.FC<TaskEditorModalProps> = ({ task, isOpen, project
                 <div className="flex-1 overflow-y-auto">
                     <div className="p-4 sm:p-6 border-t border-slate-800/60 bg-slate-950/30 space-y-2">
                         <PropertyRow icon={<CalendarIcon className="w-5 h-5" />} label="تاریخ">
-                             <input type="date" value={formState.due_date?.split('T')[0] || ''} onChange={e => setFormState(s => ({...s, due_date: e.target.value}))} className="bg-slate-800/60 px-3 py-1.5 rounded-md focus:outline-none focus:ring-2 focus:ring-sky-500 w-full text-sm font-medium"/>
+                             <PersianDatePicker 
+                                value={formState.due_date} 
+                                onChange={isoDate => setFormState(s => ({...s, due_date: isoDate}))} 
+                             />
                         </PropertyRow>
                          <PropertyRow icon={<FlagIcon className="w-5 h-5" />} label="اولویت">
                             <div className="flex gap-2">

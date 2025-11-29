@@ -1,6 +1,10 @@
+
 import React, { useMemo, useState } from 'react';
 import { Task, Note, Priority, Project, Habit } from '../types';
-import { PlusIcon, TargetIcon, ListChecksIcon, BriefcaseIcon, CheckIcon, FlameIcon, NotebookIcon } from './icons';
+import { PlusIcon, ListChecksIcon, BriefcaseIcon, CheckIcon, FlameIcon, NotebookIcon, UserIcon, LogOutIcon, BellIcon, MoonIcon, ShieldIcon, XIcon } from './icons';
+import { useAuth } from '../contexts/AuthContext';
+import { User } from '@supabase/supabase-js';
+import { formatPersianDate, toJalaali, persianMonths } from '../utils/dateUtils';
 
 interface DashboardProps {
   tasks: Task[];
@@ -23,10 +27,6 @@ const getDateString = (date: Date) => {
     return `${year}-${month}-${day}`;
 };
 
-const getPersianDate = (date: Date, options: Intl.DateTimeFormatOptions = {}) => {
-    return date.toLocaleDateString('fa-IR', options);
-};
-
 const isSameDay = (d1: Date, d2: Date) => {
     return d1.getFullYear() === d2.getFullYear() &&
            d1.getMonth() === d2.getMonth() &&
@@ -40,11 +40,110 @@ const Widget: React.FC<{children: React.ReactNode, className?: string}> = ({ chi
   </div>
 );
 
+// --- Profile Modal ---
+const ProfileModal: React.FC<{ isOpen: boolean; onClose: () => void; user: User | null; signOut: () => void }> = ({ isOpen, onClose, user, signOut }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div 
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-300"
+            onClick={onClose}
+        >
+            <div 
+                className="bg-gray-900 border border-white/10 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all"
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Header */}
+                <div className="relative bg-gradient-to-br from-indigo-900 to-purple-900 p-6 pt-10 text-center">
+                    <button onClick={onClose} className="absolute top-4 right-4 p-1.5 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors">
+                        <XIcon className="w-5 h-5" />
+                    </button>
+                    <div className="w-20 h-20 mx-auto bg-gray-950 rounded-full flex items-center justify-center border-4 border-gray-900 shadow-xl mb-3 relative group cursor-pointer">
+                        <div className="absolute inset-0 bg-gradient-to-tr from-sky-500 to-fuchsia-500 rounded-full opacity-20 group-hover:opacity-40 transition-opacity"></div>
+                        <span className="text-3xl font-bold text-white relative z-10">
+                            {user?.email?.[0].toUpperCase() || <UserIcon className="w-10 h-10"/>}
+                        </span>
+                    </div>
+                    <h3 className="text-white font-bold text-lg truncate px-4">{user?.email}</h3>
+                    <div className="inline-block mt-2 px-3 py-1 bg-white/10 rounded-full text-[10px] font-semibold text-sky-200 border border-white/10">
+                        نسخه رایگان
+                    </div>
+                </div>
+
+                {/* Body */}
+                <div className="p-6 space-y-5">
+                    {/* Dummy Info Section */}
+                    <div className="space-y-3">
+                        <div>
+                            <label className="text-xs text-gray-500 mb-1 block">نام و نام خانوادگی</label>
+                            <input disabled type="text" placeholder="نام خود را وارد کنید" className="w-full bg-gray-800/50 border border-white/5 rounded-lg px-3 py-2 text-sm text-gray-400 cursor-not-allowed" />
+                        </div>
+                        <div>
+                            <label className="text-xs text-gray-500 mb-1 block">شماره موبایل</label>
+                            <input disabled type="text" placeholder="0912..." className="w-full bg-gray-800/50 border border-white/5 rounded-lg px-3 py-2 text-sm text-gray-400 cursor-not-allowed" />
+                        </div>
+                    </div>
+
+                    <div className="h-px bg-white/5 my-2"></div>
+
+                    {/* Settings Placeholders */}
+                    <div className="space-y-1">
+                        <button disabled className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors group cursor-not-allowed opacity-60">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400 group-hover:text-indigo-300">
+                                    <ShieldIcon className="w-5 h-5" />
+                                </div>
+                                <span className="text-sm text-gray-300">امنیت حساب</span>
+                            </div>
+                        </button>
+                        <button disabled className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors group cursor-not-allowed opacity-60">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-yellow-500/10 rounded-lg text-yellow-400 group-hover:text-yellow-300">
+                                    <BellIcon className="w-5 h-5" />
+                                </div>
+                                <span className="text-sm text-gray-300">اعلان‌ها</span>
+                            </div>
+                        </button>
+                        <button disabled className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors group cursor-not-allowed opacity-60">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-sky-500/10 rounded-lg text-sky-400 group-hover:text-sky-300">
+                                    <MoonIcon className="w-5 h-5" />
+                                </div>
+                                <span className="text-sm text-gray-300">ظاهر برنامه</span>
+                            </div>
+                        </button>
+                    </div>
+
+                    <button 
+                        onClick={signOut}
+                        className="w-full flex items-center justify-center gap-2 p-3 mt-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all font-semibold text-sm"
+                    >
+                        <LogOutIcon className="w-4 h-4" />
+                        <span>خروج از حساب</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // --- Header ---
-const DashboardHeader: React.FC = () => (
-    <header>
-        <h1 className="text-3xl font-bold text-white">داشبورد</h1>
-        <p className="text-gray-400 mt-1">مرکز فرماندهی هوشمند شما.</p>
+const DashboardHeader: React.FC<{ user: User | null; onOpenProfile: () => void }> = ({ user, onOpenProfile }) => (
+    <header className="flex justify-between items-center mb-6">
+        <div>
+            <h1 className="text-3xl font-bold text-white">داشبورد</h1>
+            <p className="text-gray-400 mt-1 text-sm">مرکز فرماندهی هوشمند شما.</p>
+        </div>
+        <button 
+            onClick={onOpenProfile}
+            className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 p-0.5 shadow-lg shadow-indigo-500/30 hover:scale-105 transition-transform group"
+            aria-label="پروفایل کاربری"
+        >
+            <div className="w-full h-full bg-gray-900 rounded-full flex items-center justify-center text-white font-bold text-lg overflow-hidden relative">
+                {user?.email?.[0].toUpperCase() || <UserIcon className="w-6 h-6"/>}
+                <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            </div>
+        </button>
     </header>
 );
 
@@ -63,31 +162,41 @@ const WeekCalendar: React.FC<{ selectedDate: Date; onDateChange: (date: Date) =>
                 date,
                 isToday: isSameDay(date, today),
                 isSelected: isSameDay(date, selectedDate),
-                dayName: getPersianDate(date, { weekday: 'short' }),
-                dayNumber: getPersianDate(date, { day: 'numeric' }),
+                dayName: date.toLocaleDateString('fa-IR', { weekday: 'short' }),
+                dayNumber: date.toLocaleDateString('fa-IR', { day: 'numeric' }),
             });
         }
         return days;
     }, [selectedDate]);
 
+    const headerInfo = useMemo(() => {
+        const j = toJalaali(selectedDate);
+        return `${persianMonths[j.jm - 1]} ${j.jy}`;
+    }, [selectedDate]);
+
     return (
-        <div className="grid grid-cols-7 gap-2 md:gap-3">
-            {weekDays.map(({ date, isSelected, dayNumber, dayName, isToday }) => (
-                 <button
-                    key={date.toISOString()}
-                    onClick={() => onDateChange(date)}
-                    className="relative flex flex-col justify-center items-center h-20 w-full rounded-2xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-950 focus:ring-fuchsia-500"
-                    aria-label={`انتخاب تاریخ ${getPersianDate(date)}`}
-                    aria-pressed={isSelected}
-                >
-                    <div className={`absolute inset-0 rounded-2xl transition-all duration-300 ${isSelected ? 'bg-fuchsia-600/80 shadow-lg shadow-fuchsia-900/50' : `bg-gray-800/50 ${!isToday && 'hover:bg-gray-800/80'}`}`}></div>
-                    {isToday && !isSelected && (
-                         <div className="absolute inset-0 rounded-2xl border-2 border-sky-500/50 pointer-events-none"></div>
-                    )}
-                    <span className={`relative text-xs font-semibold ${isSelected ? 'text-white' : 'text-gray-400'}`}>{dayName}</span>
-                    <span className="relative text-xl font-bold mt-1 text-white">{dayNumber}</span>
-                </button>
-            ))}
+        <div className="space-y-3">
+            <div className="flex items-center justify-center px-2">
+                <span className="text-sm font-bold text-gray-400">{headerInfo}</span>
+            </div>
+            <div className="grid grid-cols-7 gap-2 md:gap-3">
+                {weekDays.map(({ date, isSelected, dayNumber, dayName, isToday }) => (
+                    <button
+                        key={date.toISOString()}
+                        onClick={() => onDateChange(date)}
+                        className="relative flex flex-col justify-center items-center h-20 w-full rounded-2xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-950 focus:ring-fuchsia-500"
+                        aria-label={`انتخاب تاریخ ${formatPersianDate(date)}`}
+                        aria-pressed={isSelected}
+                    >
+                        <div className={`absolute inset-0 rounded-2xl transition-all duration-300 ${isSelected ? 'bg-fuchsia-600/80 shadow-lg shadow-fuchsia-900/50' : `bg-gray-800/50 ${!isToday && 'hover:bg-gray-800/80'}`}`}></div>
+                        {isToday && !isSelected && (
+                            <div className="absolute inset-0 rounded-2xl border-2 border-sky-500/50 pointer-events-none"></div>
+                        )}
+                        <span className={`relative text-xs font-semibold ${isSelected ? 'text-white' : 'text-gray-400'}`}>{dayName}</span>
+                        <span className="relative text-xl font-bold mt-1 text-white">{dayNumber}</span>
+                    </button>
+                ))}
+            </div>
         </div>
     );
 };
@@ -127,7 +236,7 @@ const TodaysPlan: React.FC<{
             ) : (
                 <div className="text-center py-10 text-gray-500 text-sm">
                     <ListChecksIcon className="w-10 h-10 mx-auto mb-2 text-gray-600" />
-                    <p>امروز کاری برای انجام دادن نیست!</p>
+                    <p>در این تاریخ کاری ثبت نشده است.</p>
                 </div>
             )}
         </Widget>
@@ -314,10 +423,12 @@ const KeyProjects: React.FC<{ projects: Project[]; tasks: Task[] }> = ({ project
 // --- Main Dashboard Component ---
 const Dashboard: React.FC<DashboardProps> = (props) => {
   const { tasks, notes, projects, habits, toggleHabitCompletion, toggleTaskCompletion, selectedDate, setSelectedDate, addTask, addNote } = props;
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const { user, signOut } = useAuth();
 
   return (
     <div className="p-4 sm:p-6 pb-24 max-w-7xl mx-auto space-y-6">
-      <DashboardHeader />
+      <DashboardHeader user={user} onOpenProfile={() => setIsProfileOpen(true)} />
       <WeekCalendar selectedDate={selectedDate} onDateChange={setSelectedDate} />
       
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
@@ -335,6 +446,13 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
             <KeyProjects projects={projects} tasks={tasks} />
         </div>
       </div>
+
+      <ProfileModal 
+        isOpen={isProfileOpen} 
+        onClose={() => setIsProfileOpen(false)} 
+        user={user} 
+        signOut={signOut} 
+      />
     </div>
   );
 };
