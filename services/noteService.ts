@@ -1,3 +1,4 @@
+
 import { supabase } from './supabaseClient';
 import { Note } from '../types';
 
@@ -44,9 +45,12 @@ export const createNote = async (note: NoteInsert): Promise<Note> => {
 };
 
 export const updateNote = async (id: string, updates: NoteUpdate) => {
+  // SANITIZATION: Remove potential UI-joined fields
+  const { project, ...cleanUpdates } = updates as any;
+
   const { data, error } = await supabase
     .from('notes')
-    .update(updates)
+    .update(cleanUpdates)
     .eq('id', id)
     .select()
     .single();
