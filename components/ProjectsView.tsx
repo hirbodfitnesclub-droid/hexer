@@ -223,6 +223,10 @@ interface ProjectsViewProps {
   deleteNote: (id: string) => void;
   editingProject: Partial<Project> | null;
   setEditingProject: React.Dispatch<React.SetStateAction<Partial<Project> | null>>;
+  onLoadMore: () => void;
+  loading: boolean;
+  hasMore: boolean;
+  errorMessage?: string;
 }
 
 const calculateProjectStats = (projectId: string, tasks: Task[]) => {
@@ -238,7 +242,7 @@ const calculateProjectStats = (projectId: string, tasks: Task[]) => {
     return { progress, activeTasks };
 };
 
-const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, tasks, notes, addProject, updateProject, deleteProject, updateTask, deleteTask, updateNote, deleteNote, editingProject, setEditingProject }) => {
+const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, tasks, notes, addProject, updateProject, deleteProject, updateTask, deleteTask, updateNote, deleteNote, editingProject, setEditingProject, onLoadMore, loading, hasMore, errorMessage }) => {
     const [viewingProject, setViewingProject] = useState<Project | null>(null);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     const [editingNote, setEditingNote] = useState<Note | null>(null);
@@ -295,11 +299,36 @@ const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, tasks, notes, add
                     <span>ساخت اولین پروژه</span>
                 </button>
             </div>
-      )}
+        )}
 
-      {/* --- Edit/Add Project Modal --- */}
-      <Modal title={isAdding ? "پروژه جدید" : "ویرایش پروژه"} isOpen={!!editingProject} onClose={() => setEditingProject(null)}>
-        {editingProject && (
+        {errorMessage && (
+            <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-200 text-sm">
+                {errorMessage}
+            </div>
+        )}
+        <div className="flex items-center justify-center py-6">
+            {loading && (
+                <div className="flex items-center gap-2 text-gray-400 text-sm">
+                    <span className="w-4 h-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></span>
+                    در حال بارگذاری...
+                </div>
+            )}
+            {!loading && hasMore && (
+                <button
+                    onClick={onLoadMore}
+                    className="px-4 py-2 text-sm rounded-lg bg-gray-800/70 border border-white/10 text-gray-200 hover:bg-gray-800 transition-colors"
+                >
+                    پروژه‌های بیشتر
+                </button>
+            )}
+            {!loading && !hasMore && projects.length > 0 && (
+                <p className="text-sm text-gray-500">همه پروژه‌ها نمایش داده شد.</p>
+            )}
+        </div>
+
+        {/* --- Edit/Add Project Modal --- */}
+        <Modal title={isAdding ? "پروژه جدید" : "ویرایش پروژه"} isOpen={!!editingProject} onClose={() => setEditingProject(null)}>
+          {editingProject && (
             <div className="space-y-4">
                 <input type="text" value={editingProject.title || ''} onChange={e => setEditingProject(s => s ? { ...s, title: e.target.value } : null)} placeholder="نام پروژه" className="w-full bg-gray-700/80 p-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500" />
                 <textarea value={editingProject.description || ''} onChange={e => setEditingProject(s => s ? { ...s, description: e.target.value } : null)} placeholder="توضیحات پروژه..." rows={4} className="w-full bg-gray-700/80 p-3 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500" />

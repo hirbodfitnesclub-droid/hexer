@@ -4,14 +4,29 @@ import { Project } from '../types';
 type ProjectInsert = Omit<Project, 'id' | 'user_id' | 'created_at' | 'updated_at'>;
 type ProjectUpdate = Partial<Omit<Project, 'id' | 'user_id' | 'created_at' | 'updated_at'>>;
 
-export const getProjects = async (): Promise<Project[]> => {
-  const { data, error } = await supabase
+interface ProjectQueryOptions {
+  limit?: number;
+  offset?: number;
+  userId?: string;
+}
+
+export const getProjects = async ({ limit = 20, offset = 0, userId }: ProjectQueryOptions = {}) => {
+  const query = supabase
     .from('projects')
     .select('*')
     .order('created_at', { ascending: false });
 
+  if (userId) query.eq('user_id', userId);
+
+  const { data, error } = await query.range(offset, offset + limit);
+
   if (error) throw error;
-  return data as Project[];
+
+  const items = (data as Project[]) || [];
+  return {
+    items: items.slice(0, limit),
+    hasMore: items.length > limit
+  };
 };
 
 export const createProject = async (project: ProjectInsert) => {

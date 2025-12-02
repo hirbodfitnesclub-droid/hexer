@@ -125,9 +125,13 @@ interface TasksViewProps {
   deleteTask: (id: string) => void;
   addTask: (task: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'status' | 'completed_at'>) => void;
   updateTask: (task: Task) => void;
+  onLoadMore: () => void;
+  loading: boolean;
+  hasMore: boolean;
+  errorMessage?: string;
 }
 
-const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, updateTask, toggleTaskCompletion, deleteTask }) => {
+const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, updateTask, toggleTaskCompletion, deleteTask, onLoadMore, loading, hasMore, errorMessage }) => {
     const [viewMode, setViewMode] = useState<ViewMode>('agenda');
     const [editingTask, setEditingTask] = useState<Task | Partial<Task> | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -328,8 +332,33 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, 
                         )}
                     </div>
                 )}
+
+                {errorMessage && (
+                    <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-200 text-sm">
+                        {errorMessage}
+                    </div>
+                )}
+                <div className="flex items-center justify-center py-4">
+                    {loading && (
+                        <div className="flex items-center gap-2 text-gray-400 text-sm">
+                            <span className="w-4 h-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></span>
+                            در حال بارگذاری...
+                        </div>
+                    )}
+                    {!loading && hasMore && (
+                        <button
+                            onClick={onLoadMore}
+                            className="px-4 py-2 text-sm rounded-lg bg-gray-800/70 border border-white/10 text-gray-200 hover:bg-gray-800 transition-colors"
+                        >
+                            بارگذاری بیشتر
+                        </button>
+                    )}
+                    {!loading && !hasMore && groupedTasks.length > 0 && (
+                        <p className="text-sm text-gray-500">همه موارد نمایش داده شد.</p>
+                    )}
+                </div>
             </div>
-            
+
             <button onClick={handleAddNewTask} className="fixed bottom-24 right-6 w-16 h-16 bg-gradient-to-br from-sky-500 to-fuchsia-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-sky-500/30 hover:scale-110 transition-transform duration-300 z-30" aria-label="Add new task">
                 <PlusIcon className="w-8 h-8"/>
             </button>
