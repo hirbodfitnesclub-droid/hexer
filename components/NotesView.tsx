@@ -1,83 +1,68 @@
 
 import React, { useState, useMemo } from 'react';
 import { Note, Project, Task } from '../types';
-import { TrashIcon, NotebookIcon, SearchIcon, PlusIcon, PencilIcon, LightbulbIcon, PinIcon, BookmarkIcon, TagIcon, LinkIcon } from './icons';
+import { PlusIcon, SearchIcon, HashIcon } from './icons';
 import NoteEditorModal from './NoteEditorModal';
 import { formatPersianDate } from '../utils/dateUtils';
 
-// --- Helper Data & Functions ---
-const projectColorText: { [key: string]: string } = {
-    sky: 'text-sky-300', red: 'text-red-300', green: 'text-green-300',
-    yellow: 'text-yellow-300', purple: 'text-purple-300', gray: 'text-gray-300',
-};
-const projectColorBg: { [key: string]: string } = {
-    sky: 'bg-sky-500/10', red: 'bg-red-500/10', green: 'bg-green-500/10',
-    yellow: 'bg-yellow-500/10', purple: 'bg-purple-500/10', gray: 'bg-gray-500/10',
-};
-
-const predefinedTags = [
-    { name: 'ایده', icon: <LightbulbIcon className="w-4 h-4 text-yellow-300"/>, color: 'bg-yellow-500/10 text-yellow-300' },
-    { name: 'مهم', icon: <PinIcon className="w-4 h-4 text-red-300"/>, color: 'bg-red-500/10 text-red-300' },
-    { name: 'برای بعد', icon: <BookmarkIcon className="w-4 h-4 text-sky-300"/>, color: 'bg-sky-500/10 text-sky-300' },
-];
-
-const getTagStyle = (tagName: string) => {
-    const predefined = predefinedTags.find(t => t.name === tagName);
-    if (predefined) return { icon: predefined.icon, color: predefined.color };
-    return { icon: <TagIcon className="w-4 h-4 text-gray-300"/>, color: 'bg-gray-500/10 text-gray-300' };
-};
-
-// --- NoteCard Component ---
+// --- Redesigned Note Card: "Luxury Glass" ---
 const NoteCard: React.FC<{
     note: Note;
     project?: Project;
-    onDelete: (id: string) => void;
     onEdit: (note: Note) => void;
-}> = ({ note, project, onDelete, onEdit }) => {
+}> = ({ note, project, onEdit }) => {
     return (
         <div 
             onClick={() => onEdit(note)}
-            className="group mb-4 break-inside-avoid rounded-2xl bg-gray-800/50 border border-white/10 transition-all duration-300 hover:border-white/20 hover:shadow-xl hover:shadow-black/30 hover:-translate-y-1 flex flex-col cursor-pointer"
+            className="group break-inside-avoid mb-6 cursor-pointer relative"
         >
-            <div className="p-5 flex-1">
-                <div className="flex justify-between items-start gap-2 mb-3">
-                    <h3 className="font-bold text-gray-100 break-words">{note.title}</h3>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex-shrink-0">
-                        <button onClick={(e) => { e.stopPropagation(); onEdit(note); }} className="p-1.5 rounded-md bg-gray-700/50 hover:bg-gray-700 text-gray-400 hover:text-sky-400">
-                            <PencilIcon className="w-4 h-4"/>
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); onDelete(note.id); }} className="p-1.5 rounded-md bg-gray-700/50 hover:bg-gray-700 text-gray-400 hover:text-red-400">
-                            <TrashIcon className="w-4 h-4"/>
-                        </button>
-                    </div>
-                </div>
-                <p className="text-gray-300 text-sm whitespace-pre-wrap line-clamp-4">{note.content}</p>
-            </div>
+            {/* Background & Glow */}
+            <div className="absolute -inset-0.5 bg-gradient-to-br from-purple-500/20 to-fuchsia-600/20 rounded-[2rem] opacity-0 group-hover:opacity-100 blur-xl transition-opacity duration-500"></div>
             
-            <div className="border-t border-white/10 mt-auto px-4 py-3 space-y-3">
-                 {note.tags && note.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                        {note.tags.map(tag => {
-                            const { icon, color } = getTagStyle(tag);
-                            return (
-                                <div key={tag} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${color}`}>
-                                    {icon}
-                                    <span>{tag}</span>
-                                </div>
-                            );
-                        })}
-                    </div>
+            <div className="relative bg-zinc-900 border border-white/5 rounded-[1.75rem] overflow-hidden transition-all duration-300 group-hover:-translate-y-1 group-hover:border-purple-500/30">
+                {/* Decoration: Project Indicator */}
+                {project && (
+                    <div className={`absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-transparent via-${project.color}-500 to-transparent opacity-50`}></div>
                 )}
-                 <div className="flex justify-between items-center text-xs text-gray-500">
-                    <div className="flex items-center gap-3">
+
+                <div className="p-6 flex flex-col gap-4">
+                    {/* Header */}
+                    <div className="flex justify-between items-start gap-4">
+                        <h3 className="text-xl font-bold text-white leading-snug tracking-tight group-hover:text-purple-100 transition-colors">
+                            {note.title || "بدون عنوان"}
+                        </h3>
                         {project && (
-                            <div className={`px-2 py-0.5 rounded-full font-semibold flex items-center gap-1.5 ${projectColorBg[project.color]} ${projectColorText[project.color]}`}>
-                                <div className={`w-1.5 h-1.5 rounded-full bg-current`}></div>
+                            <span className="flex-shrink-0 text-[10px] font-bold tracking-wider uppercase text-zinc-500 bg-zinc-800/50 px-2 py-1 rounded-md border border-white/5">
                                 {project.title}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Content Preview */}
+                    <p className="text-zinc-400 text-sm font-light leading-relaxed line-clamp-6 opacity-90 group-hover:text-zinc-300 transition-colors">
+                        {note.content}
+                    </p>
+
+                    {/* Footer: Meta & Tags */}
+                    <div className="pt-4 mt-2 border-t border-white/5 flex flex-wrap items-center justify-between gap-3">
+                        <span className="text-[10px] text-zinc-600 font-mono">
+                            {formatPersianDate(note.created_at)}
+                        </span>
+                        
+                        {note.tags && note.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 justify-end">
+                                {note.tags.slice(0, 3).map(tag => (
+                                    <div key={tag} className="flex items-center gap-0.5 px-2 py-1 rounded-md bg-zinc-800/80 text-[10px] text-zinc-400 group-hover:bg-purple-500/10 group-hover:text-purple-300 transition-colors">
+                                        <span className="opacity-50">#</span>
+                                        {tag}
+                                    </div>
+                                ))}
+                                {note.tags.length > 3 && (
+                                    <span className="text-[10px] text-zinc-600">+{note.tags.length - 3}</span>
+                                )}
                             </div>
                         )}
                     </div>
-                    <span>{formatPersianDate(note.created_at)}</span>
                 </div>
             </div>
         </div>
@@ -102,30 +87,18 @@ const NotesView: React.FC<{
         setCurrentNote({ title: '', content: '', tags: [], project_id: undefined });
     };
 
-    const openModalForEdit = (note: Note) => {
-        setCurrentNote(note);
-    };
-    
-    const closeModal = () => {
-        setCurrentNote(null);
-    };
-    
     const handleSave = (noteToSave: Note | Partial<Note>) => {
         if (!noteToSave || (!noteToSave.title?.trim() && !noteToSave.content?.trim())) {
-             if (noteToSave && 'id' in noteToSave && noteToSave.id) {
-                // Do not delete if it was an existing note that became empty, user might have made a mistake.
-             } else {
-                 closeModal();
-                 return;
-             }
+             setCurrentNote(null);
+             return;
         }
         
-        if ('id' in noteToSave && noteToSave.id) { // Editing existing note
+        if ('id' in noteToSave && noteToSave.id) {
             updateNote(noteToSave as Note);
-        } else { // Adding new note
+        } else {
             addNote(noteToSave as Omit<Note, 'id' | 'created_at' | 'updated_at' | 'user_id'>);
         }
-        closeModal();
+        setCurrentNote(null);
     };
 
     const filteredNotes = useMemo(() => {
@@ -140,54 +113,66 @@ const NotesView: React.FC<{
     }, [notes, searchQuery, projectMap]);
 
   return (
-    <div className="p-4 pt-8 pb-28">
-      <header className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
-        <h1 className="text-3xl font-bold text-white">یادداشت‌ها</h1>
-        <div className="relative w-full sm:w-auto sm:max-w-xs">
-            <input 
-                type="text"
-                placeholder="جستجو در یادداشت‌ها..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full bg-gray-800/70 border border-white/10 rounded-xl py-2.5 pr-10 pl-4 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-            />
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
-                <SearchIcon className="w-5 h-5" />
+    <div className="min-h-full pb-32 bg-zinc-950 text-white relative">
+        {/* Header Section */}
+        <div className="sticky top-0 z-30 px-6 py-8 bg-zinc-950/90 backdrop-blur-xl border-b border-white/5">
+            <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+                <div>
+                    <h1 className="text-4xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-white via-purple-200 to-purple-400">
+                        یادداشت‌ها
+                    </h1>
+                    <p className="text-zinc-500 text-sm mt-1 font-medium">فضایی برای ایده‌های بی‌پایان</p>
+                </div>
+                
+                {/* Search Input */}
+                <div className="relative w-full md:w-96 group">
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                        <SearchIcon className="w-5 h-5 text-zinc-600 group-focus-within:text-purple-400 transition-colors" />
+                    </div>
+                    <input 
+                        type="text"
+                        placeholder="جستجو..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="w-full bg-zinc-900 border border-zinc-800 text-zinc-200 placeholder-zinc-600 rounded-2xl py-3 pr-12 pl-4 outline-none focus:border-purple-500/50 focus:bg-zinc-900/80 transition-all duration-300 shadow-inner"
+                    />
+                </div>
             </div>
         </div>
-      </header>
 
-      {filteredNotes.length > 0 ? (
-        <div className="columns-1 sm:columns-2 xl:columns-3 2xl:columns-4 gap-4">
-            {filteredNotes.map(note => (
-                <NoteCard 
-                    key={note.id} 
-                    note={note} 
-                    project={note.project_id ? projectMap.get(note.project_id) : undefined}
-                    onDelete={deleteNote} 
-                    onEdit={openModalForEdit}
-                />
-            ))}
-        </div>
-      ) : (
-        <div className="text-center py-20 flex flex-col items-center">
-            <NotebookIcon className="w-16 h-16 text-gray-700 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-400">
-                {searchQuery ? 'نتیجه‌ای یافت نشد' : 'فضایی برای ایده‌های بزرگ شما!'}
-            </h3>
-            <p className="text-gray-500 mt-2 max-w-sm">
-                {searchQuery ? 'عبارت جستجوی خود را تغییر دهید یا فیلترها را پاک کنید.' : 'یادداشت‌ها بهترین مکان برای ثبت افکار، ایده‌ها و اطلاعات مهم هستند. اولین یادداشت خود را بسازید.'}
-            </p>
-             {!searchQuery && (
-                <button onClick={openModalForNew} className="mt-6 flex items-center gap-2 px-5 py-2.5 bg-purple-600 rounded-lg text-white font-semibold hover:bg-purple-700 transition-colors shadow-lg shadow-purple-900/40">
-                    <PlusIcon className="w-5 h-5" />
-                    <span>ساخت اولین یادداشت</span>
-                </button>
+        {/* Content Area */}
+        <div className="px-4 sm:px-8 pt-8 max-w-[1600px] mx-auto">
+            {filteredNotes.length > 0 ? (
+                // Masonry Layout using CSS Columns
+                <div className="columns-1 md:columns-2 xl:columns-3 gap-6 space-y-6">
+                    {filteredNotes.map(note => (
+                        <NoteCard 
+                            key={note.id} 
+                            note={note} 
+                            project={note.project_id ? projectMap.get(note.project_id) : undefined}
+                            onEdit={setCurrentNote}
+                        />
+                    ))}
+                </div>
+            ) : (
+                <div className="flex flex-col items-center justify-center py-32 text-center opacity-0 animate-fade-in-up" style={{animationDelay: '0.1s', opacity: 1}}>
+                    <div className="relative mb-6">
+                        <div className="absolute inset-0 bg-purple-500/20 blur-2xl rounded-full"></div>
+                        <HashIcon className="relative w-20 h-20 text-zinc-800" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-zinc-300 mb-2">هنوز خالیست</h3>
+                    <p className="text-zinc-600 max-w-xs leading-relaxed">
+                        ذهن شما پر از ایده است. اولین یادداشت خود را همین حالا ثبت کنید.
+                    </p>
+                </div>
             )}
         </div>
-      )}
       
-       <button onClick={openModalForNew} className="fixed bottom-24 right-6 w-16 h-16 bg-gradient-to-br from-purple-500 to-fuchsia-500 rounded-full flex items-center justify-center text-white shadow-lg shadow-purple-500/30 hover:scale-110 transition-transform duration-300 z-30" aria-label="یادداشت جدید">
+       {/* Floating Action Button */}
+       <button 
+            onClick={openModalForNew} 
+            className="fixed bottom-24 right-8 w-16 h-16 bg-gradient-to-tr from-purple-600 to-fuchsia-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-purple-500/40 hover:scale-110 hover:rotate-90 transition-all duration-500 z-40 group"
+       >
             <PlusIcon className="w-8 h-8"/>
        </button>
       
@@ -195,7 +180,7 @@ const NotesView: React.FC<{
             <NoteEditorModal
                 note={currentNote}
                 isOpen={!!currentNote}
-                onClose={closeModal}
+                onClose={() => setCurrentNote(null)}
                 onSave={handleSave}
                 onDelete={deleteNote}
                 projects={projects}

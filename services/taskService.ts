@@ -42,10 +42,26 @@ export const createTask = async (task: TaskInsert): Promise<Task> => {
 
   if (error) throw error;
   
-  const createdTask = data as Task;
+  let createdTask = data as Task;
 
-  // Trigger background vectorization
-  triggerVectorization(createdTask.id, `${createdTask.title} ${createdTask.description || ''} ${createdTask.tags ? createdTask.tags.join(' ') : ''}`);
+  // Since RPC doesn't handle the new checklist column, we might need to update it immediately if provided
+  if (task.checklist && task.checklist.length > 0) {
+      const { data: updatedData, error: updateError } = await supabase
+          .from('tasks')
+          .update({ checklist: task.checklist })
+          .eq('id', createdTask.id)
+          .select()
+          .single();
+      
+      if (!updateError && updatedData) {
+          createdTask = updatedData as Task;
+      }
+  }
+
+  // Trigger background vectorization including checklist content
+  const checklistText = createdTask.checklist ? createdTask.checklist.map(i => i.text).join(' ') : '';
+  const content = `${createdTask.title} ${createdTask.description || ''} ${createdTask.tags ? createdTask.tags.join(' ') : ''} ${checklistText}`;
+  triggerVectorization(createdTask.id, content);
 
   return createdTask;
 };
@@ -66,8 +82,9 @@ export const updateTask = async (id: string, updates: TaskUpdate) => {
   if (error) throw error;
 
   // Trigger re-vectorization if text content changed
-  if (updates.title || updates.description || updates.tags) {
-       const content = `${data.title} ${data.description || ''} ${data.tags ? data.tags.join(' ') : ''}`;
+  if (updates.title || updates.description || updates.tags || updates.checklist) {
+       const checklistText = data.checklist ? data.checklist.map((i: any) => i.text).join(' ') : '';
+       const content = `${data.title} ${data.description || ''} ${data.tags ? data.tags.join(' ') : ''} ${checklistText}`;
        triggerVectorization(data.id, content);
   }
 

@@ -42,6 +42,9 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, onToggle, onDelete
             onToggle(task.id);
         }, 300);
     };
+
+    const checklistTotal = task.checklist?.length || 0;
+    const checklistCompleted = task.checklist?.filter(i => i.isCompleted).length || 0;
     
     return (
         <div 
@@ -74,6 +77,12 @@ const TaskCard: React.FC<TaskCardProps> = React.memo(({ task, onToggle, onDelete
                     )}
                     {task.due_date && (
                         <span>{formatPersianDate(task.due_date)}</span>
+                    )}
+                    {checklistTotal > 0 && (
+                        <div className={`flex items-center gap-1.5 ${checklistCompleted === checklistTotal ? 'text-green-400' : 'text-gray-400'}`}>
+                            <ListChecksIcon className="w-3.5 h-3.5" />
+                            <span>{checklistCompleted}/{checklistTotal}</span>
+                        </div>
                     )}
                 </div>
                  <div className="absolute top-2 left-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
@@ -132,8 +141,8 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, 
         if ('id' in taskToSave && taskToSave.id) {
             updateTask(taskToSave as Task);
         } else {
-            const { title, description, due_date, priority, tags, project_id } = taskToSave as Partial<Task>;
-            addTask({ title: title || '', description, due_date, priority: priority || Priority.Medium, tags: tags || [], project_id });
+            const { title, description, due_date, priority, tags, project_id, checklist } = taskToSave as Partial<Task>;
+            addTask({ title: title || '', description, due_date, priority: priority || Priority.Medium, tags: tags || [], project_id, checklist });
         }
         setEditingTask(null);
     };
@@ -146,6 +155,7 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, projects, notes, addTask, 
             tags: [],
             status: 'todo',
             completed_at: null,
+            checklist: []
         });
     };
     

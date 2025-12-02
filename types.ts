@@ -15,6 +15,12 @@ export interface Project {
   updated_at: string; // timestamptz
 }
 
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  isCompleted: boolean;
+}
+
 export interface Task {
   id: string; // uuid
   user_id: string; // uuid
@@ -26,6 +32,7 @@ export interface Task {
   due_date?: string | null; // timestamptz
   completed_at?: string | null; // timestamptz
   tags?: string[] | null;
+  checklist?: ChecklistItem[]; // New field for subtasks
   created_at: string; // timestamptz
   updated_at: string; // timestamptz
 }

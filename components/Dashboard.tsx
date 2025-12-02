@@ -17,6 +17,7 @@ interface DashboardProps {
   setSelectedDate: (date: Date) => void;
   addTask: (task: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'status' | 'completed_at'>) => void;
   addNote: (note: Omit<Note, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void;
+  editHabit: (habit: Habit | Partial<Habit>) => void;
 }
 
 // --- Helper Functions ---
@@ -33,6 +34,20 @@ const isSameDay = (d1: Date, d2: Date) => {
            d1.getDate() === d2.getDate();
 };
 
+const getCustomDayName = (date: Date) => {
+    const dayIndex = date.getDay(); // 0 = Sunday, 6 = Saturday
+    switch (dayIndex) {
+        case 6: return 'شنبه';
+        case 0: return 'یک';
+        case 1: return 'دو';
+        case 2: return 'سه';
+        case 3: return 'چهار';
+        case 4: return 'پنج';
+        case 5: return 'جمعه';
+        default: return '';
+    }
+};
+
 // --- Generic Widget Wrapper ---
 const Widget: React.FC<{children: React.ReactNode, className?: string}> = ({ children, className }) => (
   <div className={`bg-gray-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-5 shadow-2xl shadow-black/30 ${className}`}>
@@ -46,15 +61,15 @@ const ProfileModal: React.FC<{ isOpen: boolean; onClose: () => void; user: User 
 
     return (
         <div 
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity duration-300"
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4 transition-opacity duration-300"
             onClick={onClose}
         >
             <div 
-                className="bg-gray-900 border border-white/10 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all"
+                className="bg-gray-900 border border-white/10 rounded-3xl shadow-2xl w-full max-w-sm flex flex-col max-h-[85vh] overflow-hidden transform transition-all"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="relative bg-gradient-to-br from-indigo-900 to-purple-900 p-6 pt-10 text-center">
+                <div className="relative bg-gradient-to-br from-indigo-900 to-purple-900 p-6 pt-10 text-center flex-shrink-0">
                     <button onClick={onClose} className="absolute top-4 right-4 p-1.5 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors">
                         <XIcon className="w-5 h-5" />
                     </button>
@@ -71,7 +86,7 @@ const ProfileModal: React.FC<{ isOpen: boolean; onClose: () => void; user: User 
                 </div>
 
                 {/* Body */}
-                <div className="p-6 space-y-5">
+                <div className="p-6 pb-32 space-y-5 overflow-y-auto flex-1">
                     {/* Dummy Info Section */}
                     <div className="space-y-3">
                         <div>
@@ -127,25 +142,107 @@ const ProfileModal: React.FC<{ isOpen: boolean; onClose: () => void; user: User 
     );
 }
 
-// --- Header ---
-const DashboardHeader: React.FC<{ user: User | null; onOpenProfile: () => void }> = ({ user, onOpenProfile }) => (
-    <header className="flex justify-between items-center mb-6">
-        <div>
-            <h1 className="text-3xl font-bold text-white">داشبورد</h1>
-            <p className="text-gray-400 mt-1 text-sm">مرکز فرماندهی هوشمند شما.</p>
-        </div>
-        <button 
-            onClick={onOpenProfile}
-            className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 p-0.5 shadow-lg shadow-indigo-500/30 hover:scale-105 transition-transform group"
-            aria-label="پروفایل کاربری"
-        >
-            <div className="w-full h-full bg-gray-900 rounded-full flex items-center justify-center text-white font-bold text-lg overflow-hidden relative">
-                {user?.email?.[0].toUpperCase() || <UserIcon className="w-6 h-6"/>}
-                <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+// --- Header Component (Hexer Style with Neon Progress Ring) ---
+const DashboardHeader: React.FC<{ user: User | null; onOpenProfile: () => void; todayProgress: number; hasTasksToday: boolean }> = ({ user, onOpenProfile, todayProgress, hasTasksToday }) => {
+    // Circle Config
+    // Avatar is w-10 (40px). 
+    // We want the ring to be tight.
+    // SVG Size: 44px
+    // Stroke: 3px
+    // Inner Radius: (44/2) - 3 + (some center logic) -> effectively radius of path is 20.5. Inner edge is 19px.
+    // Avatar Outer Radius: 20px.
+    // 1px Overlap -> Perfect "no gap" fit.
+    const size = 44; 
+    const strokeWidth = 3; 
+    const radius = (size - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - (todayProgress / 100) * circumference;
+    
+    // Determining color based on progress
+    // If no tasks: gray. If 100%: Green/Gold Neon. Else: Purple/Blue Neon.
+    const isComplete = hasTasksToday && todayProgress === 100;
+    
+    return (
+        <header className="sticky top-0 z-50 w-full bg-gray-950/80 backdrop-blur-xl border-b border-white/10 transition-all duration-300">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+                {/* Right Side: Profile & Greeting (RTL Start) */}
+                <div className="flex items-center gap-4">
+                    <button 
+                        onClick={onOpenProfile}
+                        className="relative group flex items-center justify-center"
+                        style={{ width: size, height: size }}
+                        aria-label="پروفایل کاربری"
+                    >
+                        {/* Neon Progress Ring SVG */}
+                        <svg 
+                            className="absolute inset-0 transform -rotate-90 overflow-visible" 
+                            width={size} 
+                            height={size}
+                            style={{ filter: isComplete ? 'drop-shadow(0 0 4px rgba(34,197,94,0.6))' : 'drop-shadow(0 0 4px rgba(168,85,247,0.6))' }}
+                        >
+                            {/* Track */}
+                            <circle
+                                cx={size / 2}
+                                cy={size / 2}
+                                r={radius}
+                                stroke="rgba(255,255,255,0.1)"
+                                strokeWidth={strokeWidth}
+                                fill="none"
+                            />
+                            {/* Progress */}
+                            {hasTasksToday && (
+                                <>
+                                    <defs>
+                                        <linearGradient id="neonGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stopColor={isComplete ? "#4ade80" : "#a855f7"} />
+                                            <stop offset="100%" stopColor={isComplete ? "#22c55e" : "#3b82f6"} />
+                                        </linearGradient>
+                                    </defs>
+                                    <circle
+                                        cx={size / 2}
+                                        cy={size / 2}
+                                        r={radius}
+                                        stroke="url(#neonGradient)"
+                                        strokeWidth={strokeWidth}
+                                        fill="none"
+                                        strokeDasharray={circumference}
+                                        strokeDashoffset={offset}
+                                        strokeLinecap="round"
+                                        style={{ 
+                                            transition: 'stroke-dashoffset 1s ease-out',
+                                        }}
+                                    />
+                                </>
+                            )}
+                        </svg>
+
+                        {/* Avatar - w-10 = 40px */}
+                        <div className="w-10 h-10 bg-gray-900 rounded-full flex items-center justify-center text-white font-bold text-sm overflow-hidden relative z-10 border border-gray-800">
+                            {user?.email?.[0].toUpperCase() || <UserIcon className="w-5 h-5"/>}
+                            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        </div>
+                    </button>
+                    
+                    <div className="flex flex-col justify-center">
+                        <span className="text-white font-bold text-sm sm:text-base leading-none">سلام رفیق</span>
+                        <span className="text-gray-400 text-[10px] font-medium mt-1 leading-none">
+                            {hasTasksToday 
+                                ? (isComplete ? 'همه کارها تموم شد! 🎉' : `${todayProgress}% کارهای امروز`) 
+                                : 'امروز برنامه‌ای نیست'}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Left Side: Brand (RTL End) */}
+                <div>
+                     <h1 className="text-xl sm:text-2xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-purple-500 to-fuchsia-500 select-none">
+                        HEXER
+                    </h1>
+                </div>
             </div>
-        </button>
-    </header>
-);
+        </header>
+    );
+};
 
 // --- Calendar ---
 const WeekCalendar: React.FC<{ selectedDate: Date; onDateChange: (date: Date) => void; }> = ({ selectedDate, onDateChange }) => {
@@ -162,7 +259,7 @@ const WeekCalendar: React.FC<{ selectedDate: Date; onDateChange: (date: Date) =>
                 date,
                 isToday: isSameDay(date, today),
                 isSelected: isSameDay(date, selectedDate),
-                dayName: date.toLocaleDateString('fa-IR', { weekday: 'short' }),
+                dayName: getCustomDayName(date),
                 dayNumber: date.toLocaleDateString('fa-IR', { day: 'numeric' }),
             });
         }
@@ -175,25 +272,44 @@ const WeekCalendar: React.FC<{ selectedDate: Date; onDateChange: (date: Date) =>
     }, [selectedDate]);
 
     return (
-        <div className="space-y-3">
-            <div className="flex items-center justify-center px-2">
-                <span className="text-sm font-bold text-gray-400">{headerInfo}</span>
+        <div className="space-y-4">
+             {/* Header Info (Month Year) */}
+            <div className="flex items-center justify-center mb-2">
+                <span className="text-xs font-bold text-gray-400 tracking-wide bg-gray-800/40 px-3 py-1 rounded-full border border-white/5">{headerInfo}</span>
             </div>
-            <div className="grid grid-cols-7 gap-2 md:gap-3">
+            
+            <div className="grid grid-cols-7 gap-2">
                 {weekDays.map(({ date, isSelected, dayNumber, dayName, isToday }) => (
                     <button
                         key={date.toISOString()}
                         onClick={() => onDateChange(date)}
-                        className="relative flex flex-col justify-center items-center h-20 w-full rounded-2xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-950 focus:ring-fuchsia-500"
-                        aria-label={`انتخاب تاریخ ${formatPersianDate(date)}`}
-                        aria-pressed={isSelected}
+                        className={`
+                            group relative flex flex-col items-center justify-between p-1 rounded-[1.2rem] transition-all duration-300
+                            ${isSelected 
+                                ? 'bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-purple-500/30 scale-105 z-10' 
+                                : 'bg-gray-800/40 border border-white/5 hover:bg-gray-800'}
+                        `}
+                        style={{ height: '4.5rem' }}
                     >
-                        <div className={`absolute inset-0 rounded-2xl transition-all duration-300 ${isSelected ? 'bg-fuchsia-600/80 shadow-lg shadow-fuchsia-900/50' : `bg-gray-800/50 ${!isToday && 'hover:bg-gray-800/80'}`}`}></div>
-                        {isToday && !isSelected && (
-                            <div className="absolute inset-0 rounded-2xl border-2 border-sky-500/50 pointer-events-none"></div>
-                        )}
-                        <span className={`relative text-xs font-semibold ${isSelected ? 'text-white' : 'text-gray-400'}`}>{dayName}</span>
-                        <span className="relative text-xl font-bold mt-1 text-white">{dayNumber}</span>
+                        {/* Top: Day Name */}
+                        <span className={`text-[9px] sm:text-[10px] font-medium mt-1 ${isSelected ? 'text-white/90' : 'text-gray-500 group-hover:text-gray-400'}`}>
+                            {dayName}
+                        </span>
+
+                        {/* Bottom: Number Container (Nested Box) */}
+                        <div className={`
+                            w-full flex-1 flex flex-col items-center justify-center rounded-xl mt-1
+                            ${isSelected ? 'bg-black/10 backdrop-blur-sm' : 'bg-gray-900/30'}
+                        `}>
+                            <span className={`text-base sm:text-lg font-bold leading-none ${isSelected ? 'text-white' : 'text-gray-300'}`}>
+                                {dayNumber}
+                            </span>
+                            
+                            {/* Dot for today - positioned inside the inner container */}
+                            {isToday && (
+                                <div className={`w-1 h-1 rounded-full mt-1 ${isSelected ? 'bg-white' : 'bg-sky-500'}`}></div>
+                            )}
+                        </div>
                     </button>
                 ))}
             </div>
@@ -360,27 +476,47 @@ const StatsOverview: React.FC<{ tasks: Task[], projects: Project[] }> = ({ tasks
 const HabitTracker: React.FC<{
     habits: Habit[];
     onToggle: (id: string, date: string) => void;
+    onEdit: (habit: Habit) => void;
+    onCreate: () => void;
     selectedDate: Date;
-}> = ({ habits, onToggle, selectedDate }) => {
+}> = ({ habits, onToggle, onEdit, onCreate, selectedDate }) => {
     const selectedDateString = getDateString(selectedDate);
-    if(habits.length === 0) return null;
 
     return (
          <Widget>
-            <h2 className="text-lg font-bold text-white mb-4">رهگیر عادت‌ها</h2>
-            <div className="space-y-2">
-                {habits.map(habit => {
-                    const isCompleted = habit.completedDates.includes(selectedDateString);
-                    return (
-                        <button key={habit.id} onClick={() => onToggle(habit.id, selectedDateString)} className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${isCompleted ? 'bg-green-500/20' : 'bg-gray-800/70 hover:bg-gray-800'}`}>
-                            <div className={`w-6 h-6 flex-shrink-0 rounded-md flex items-center justify-center border-2 transition-all duration-300 ${isCompleted ? 'bg-green-500 border-green-400' : 'border-gray-600'}`}>
-                                {isCompleted && <CheckIcon className="w-4 h-4 text-white"/>}
-                            </div>
-                            <span className={`text-sm transition-colors duration-300 ${isCompleted ? 'text-green-300 line-through decoration-white/50' : 'text-gray-300'}`}>{habit.name}</span>
-                        </button>
-                    )
-                })}
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-bold text-white">رهگیر عادت‌ها</h2>
+                <button onClick={onCreate} className="p-1.5 bg-orange-600/20 text-orange-400 hover:bg-orange-600/40 hover:text-orange-200 rounded-lg transition-colors">
+                    <PlusIcon className="w-4 h-4"/>
+                </button>
             </div>
+            
+            {habits.length > 0 ? (
+                <div className="space-y-2">
+                    {habits.map(habit => {
+                        const isCompleted = habit.completedDates.includes(selectedDateString);
+                        return (
+                            <div key={habit.id} className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-300 ${isCompleted ? 'bg-green-500/20' : 'bg-gray-800/70 hover:bg-gray-800'}`}>
+                                <button 
+                                    onClick={() => onToggle(habit.id, selectedDateString)}
+                                    className={`w-6 h-6 flex-shrink-0 rounded-md flex items-center justify-center border-2 transition-all duration-300 ${isCompleted ? 'bg-green-500 border-green-400' : 'border-gray-600 hover:border-orange-500'}`}
+                                >
+                                    {isCompleted && <CheckIcon className="w-4 h-4 text-white"/>}
+                                </button>
+                                <button onClick={() => onEdit(habit)} className={`text-sm flex-1 text-right transition-colors duration-300 ${isCompleted ? 'text-green-300 line-through decoration-white/50' : 'text-gray-300 hover:text-white'}`}>
+                                    {habit.name}
+                                </button>
+                            </div>
+                        )
+                    })}
+                </div>
+            ) : (
+                <div className="text-center py-6 text-gray-500 text-sm flex flex-col items-center">
+                    <FlameIcon className="w-8 h-8 text-gray-700 mb-2"/>
+                    <p>هیچ عادتی ثبت نشده.</p>
+                    <button onClick={onCreate} className="mt-2 text-xs text-orange-400 hover:text-orange-300 font-semibold">ساخت عادت جدید</button>
+                </div>
+            )}
         </Widget>
     );
 };
@@ -422,29 +558,59 @@ const KeyProjects: React.FC<{ projects: Project[]; tasks: Task[] }> = ({ project
 
 // --- Main Dashboard Component ---
 const Dashboard: React.FC<DashboardProps> = (props) => {
-  const { tasks, notes, projects, habits, toggleHabitCompletion, toggleTaskCompletion, selectedDate, setSelectedDate, addTask, addNote } = props;
+  const { tasks, notes, projects, habits, toggleHabitCompletion, toggleTaskCompletion, selectedDate, setSelectedDate, addTask, addNote, editHabit } = props;
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { user, signOut } = useAuth();
 
-  return (
-    <div className="p-4 sm:p-6 pb-24 max-w-7xl mx-auto space-y-6">
-      <DashboardHeader user={user} onOpenProfile={() => setIsProfileOpen(true)} />
-      <WeekCalendar selectedDate={selectedDate} onDateChange={setSelectedDate} />
-      
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Main Column */}
-        <div className="lg:col-span-3 space-y-6">
-            <TodaysPlan tasks={tasks} selectedDate={selectedDate} toggleTaskCompletion={toggleTaskCompletion} />
-            <TodaysNotes notes={notes} selectedDate={selectedDate} />
-            <QuickCapture onAddTask={addTask} onAddNote={addNote} selectedDate={selectedDate} />
-        </div>
+  // Calculate Today's Progress for the Header Ring
+  const todaysProgressStats = useMemo(() => {
+    const now = new Date();
+    const todayStr = getDateString(now);
+    
+    const todaysTasks = tasks.filter(t => t.due_date && t.due_date.startsWith(todayStr));
+    const total = todaysTasks.length;
+    const completed = todaysTasks.filter(t => t.status === 'done').length;
+    const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+    
+    return { progress, hasTasks: total > 0 };
+  }, [tasks]);
 
-        {/* Side Column */}
-        <div className="lg:col-span-2 space-y-6">
-            <StatsOverview tasks={tasks} projects={projects} />
-            <HabitTracker habits={habits} onToggle={toggleHabitCompletion} selectedDate={selectedDate} />
-            <KeyProjects projects={projects} tasks={tasks} />
-        </div>
+
+  return (
+    <div className="pb-24">
+      {/* Sticky Header with Smart Profile Ring */}
+      <DashboardHeader 
+        user={user} 
+        onOpenProfile={() => setIsProfileOpen(true)} 
+        todayProgress={todaysProgressStats.progress}
+        hasTasksToday={todaysProgressStats.hasTasks}
+      />
+      
+      {/* Scrollable Content Container with Top Padding for Separation */}
+      <div className="px-4 sm:px-6 max-w-7xl mx-auto space-y-6 pt-5">
+          <WeekCalendar selectedDate={selectedDate} onDateChange={setSelectedDate} />
+          
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            {/* Main Column */}
+            <div className="lg:col-span-3 space-y-6">
+                <TodaysPlan tasks={tasks} selectedDate={selectedDate} toggleTaskCompletion={toggleTaskCompletion} />
+                <TodaysNotes notes={notes} selectedDate={selectedDate} />
+                <QuickCapture onAddTask={addTask} onAddNote={addNote} selectedDate={selectedDate} />
+            </div>
+
+            {/* Side Column */}
+            <div className="lg:col-span-2 space-y-6">
+                <StatsOverview tasks={tasks} projects={projects} />
+                <HabitTracker 
+                    habits={habits} 
+                    onToggle={toggleHabitCompletion} 
+                    onEdit={editHabit}
+                    onCreate={() => editHabit({ frequency: 'daily', target_count: 1 })}
+                    selectedDate={selectedDate} 
+                />
+                <KeyProjects projects={projects} tasks={tasks} />
+            </div>
+          </div>
       </div>
 
       <ProfileModal 

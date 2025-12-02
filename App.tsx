@@ -19,6 +19,7 @@ import * as noteService from './services/noteService';
 import * as habitService from './services/habitService';
 import TaskEditorModal from './components/TaskEditorModal';
 import NoteEditorModal from './components/NoteEditorModal';
+import HabitEditorModal from './components/HabitEditorModal';
 
 
 interface AppNotification {
@@ -81,6 +82,7 @@ const MainApp: React.FC = () => {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [editingProject, setEditingProject] = useState<Partial<Project> | null>(null);
+  const [editingHabit, setEditingHabit] = useState<Habit | Partial<Habit> | null>(null);
 
 
   const { user } = useAuth();
@@ -188,7 +190,11 @@ const MainApp: React.FC = () => {
   const handleAddProject = async (project: Omit<Project, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
       try {
           const newProject = await projectService.createProject(project);
-          setProjects(prev => [newProject, ...prev]);
+          // Check for existing ID to avoid race condition with Realtime subscription
+          setProjects(prev => {
+              if (prev.some(p => p.id === newProject.id)) return prev;
+              return [newProject, ...prev];
+          });
           addNotification("پروژه با موفقیت ساخته شد.");
       } catch (error) { addNotification("خطا در ساخت پروژه.", "error"); }
   };
@@ -211,7 +217,11 @@ const MainApp: React.FC = () => {
   const handleAddTask = async (task: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'status' | 'completed_at'>) => {
       try {
           const newTask = await taskService.createTask(task);
-          setTasks(prev => [newTask, ...prev]);
+          // Safety check: Don't add if Realtime subscription already caught it
+          setTasks(prev => {
+              if (prev.some(t => t.id === newTask.id)) return prev;
+              return [newTask, ...prev];
+          });
           addNotification("کار با موفقیت اضافه شد.");
       } catch (error) { addNotification("خطا در افزودن کار.", "error"); }
   };
@@ -247,7 +257,10 @@ const MainApp: React.FC = () => {
   const handleAddNote = async (note: Omit<Note, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
       try {
           const newNote = await noteService.createNote(note);
-          setNotes(prev => [newNote, ...prev]);
+          setNotes(prev => {
+              if (prev.some(n => n.id === newNote.id)) return prev;
+              return [newNote, ...prev];
+          });
           addNotification("یادداشت با موفقیت اضافه شد.");
       } catch (error) { addNotification("خطا در افزودن یادداشت.", "error"); }
   };
@@ -289,6 +302,35 @@ const MainApp: React.FC = () => {
           addNotification("خطا در ثبت وضعیت عادت.", "error");
           setHabits(originalHabits); // Rollback on error
       }
+  };
+
+  const handleAddHabit = async (habit: Omit<Habit, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'completedDates'>) => {
+      try {
+          const newHabit = await habitService.createHabit(habit);
+          setHabits(prev => {
+              if (prev.some(h => h.id === newHabit.id)) return prev;
+              return [newHabit, ...prev];
+          });
+          addNotification("عادت با موفقیت ساخته شد.");
+      } catch (error) { addNotification("خطا در ساخت عادت.", "error"); }
+  };
+
+  const handleUpdateHabit = async (habit: Habit | Partial<Habit>) => {
+      try {
+          if (!habit.id) throw new Error("Habit ID is missing");
+          const updatedHabit = await habitService.updateHabit(habit.id, habit);
+          // Preserve completion dates in state as API doesn't return them on update
+          setHabits(prev => prev.map(h => h.id === updatedHabit.id ? { ...updatedHabit, completedDates: h.completedDates } : h));
+          addNotification("عادت به‌روزرسانی شد.");
+      } catch (error) { addNotification("خطا در به‌روزرسانی عادت.", "error"); }
+  };
+
+  const handleDeleteHabit = async (id: string) => {
+      try {
+          await habitService.deleteHabit(id);
+          setHabits(prev => prev.filter(h => h.id !== id));
+          addNotification("عادت حذف شد.");
+      } catch (error) { addNotification("خطا در حذف عادت.", "error"); }
   };
 
   // --- Handlers for Chat to open modals ---
@@ -336,6 +378,11 @@ const MainApp: React.FC = () => {
       else handleAddNote(note as any);
       setEditingNote(null);
   }
+  const handleSaveModalHabit = (habit: Habit | Partial<Habit>) => {
+      if ('id' in habit && habit.id) handleUpdateHabit(habit);
+      else handleAddHabit(habit as any);
+      setEditingHabit(null);
+  }
 
 
   const renderContent = () => {
@@ -354,6 +401,7 @@ const MainApp: React.FC = () => {
             toggleHabitCompletion={handleToggleHabit} toggleTaskCompletion={handleToggleTask}
             selectedDate={selectedDate} setSelectedDate={setSelectedDate}
             addTask={handleAddTask} addNote={handleAddNote}
+            editHabit={setEditingHabit}
         />;
       case Page.Tasks:
         return <TasksView 
@@ -388,6 +436,7 @@ const MainApp: React.FC = () => {
             toggleHabitCompletion={handleToggleHabit} toggleTaskCompletion={handleToggleTask}
             selectedDate={selectedDate} setSelectedDate={setSelectedDate}
             addTask={handleAddTask} addNote={handleAddNote}
+            editHabit={setEditingHabit}
         />;
     }
   };
@@ -413,6 +462,12 @@ const MainApp: React.FC = () => {
                     isOpen={!!editingNote} note={editingNote} 
                     projects={projects} tasks={tasks} allNotes={notes} 
                     onClose={() => setEditingNote(null)} onSave={handleSaveModalNote} onDelete={handleDeleteNote} 
+                />
+            )}
+            {editingHabit && (
+                <HabitEditorModal
+                    isOpen={!!editingHabit} habit={editingHabit}
+                    onClose={() => setEditingHabit(null)} onSave={handleSaveModalHabit} onDelete={handleDeleteHabit}
                 />
             )}
        </div>
