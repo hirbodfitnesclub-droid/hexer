@@ -18,6 +18,10 @@ interface DashboardProps {
   addTask: (task: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'status' | 'completed_at'>) => void;
   addNote: (note: Omit<Note, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void;
   editHabit: (habit: Habit | Partial<Habit>) => void;
+  habitLoading: boolean;
+  habitHasMore: boolean;
+  loadMoreHabits: () => void;
+  habitError?: string;
 }
 
 // --- Helper Functions ---
@@ -479,7 +483,11 @@ const HabitTracker: React.FC<{
     onEdit: (habit: Habit) => void;
     onCreate: () => void;
     selectedDate: Date;
-}> = ({ habits, onToggle, onEdit, onCreate, selectedDate }) => {
+    loading: boolean;
+    hasMore: boolean;
+    onLoadMore: () => void;
+    errorMessage?: string;
+}> = ({ habits, onToggle, onEdit, onCreate, selectedDate, loading, hasMore, onLoadMore, errorMessage }) => {
     const selectedDateString = getDateString(selectedDate);
 
     return (
@@ -517,6 +525,30 @@ const HabitTracker: React.FC<{
                     <button onClick={onCreate} className="mt-2 text-xs text-orange-400 hover:text-orange-300 font-semibold">ساخت عادت جدید</button>
                 </div>
             )}
+            {errorMessage && (
+                <div className="mt-3 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-200 text-sm">
+                    {errorMessage}
+                </div>
+            )}
+            <div className="flex items-center justify-center pt-4">
+                {loading && (
+                    <div className="flex items-center gap-2 text-gray-400 text-sm">
+                        <span className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></span>
+                        در حال بارگذاری...
+                    </div>
+                )}
+                {!loading && hasMore && (
+                    <button
+                        onClick={onLoadMore}
+                        className="px-3 py-1.5 text-xs rounded-lg bg-gray-800/70 border border-white/10 text-gray-200 hover:bg-gray-800 transition-colors"
+                    >
+                        بارگذاری عادت‌های بیشتر
+                    </button>
+                )}
+                {!loading && !hasMore && habits.length > 0 && (
+                    <p className="text-xs text-gray-500">تمام عادت‌ها نمایش داده شد.</p>
+                )}
+            </div>
         </Widget>
     );
 };
@@ -558,7 +590,7 @@ const KeyProjects: React.FC<{ projects: Project[]; tasks: Task[] }> = ({ project
 
 // --- Main Dashboard Component ---
 const Dashboard: React.FC<DashboardProps> = (props) => {
-  const { tasks, notes, projects, habits, toggleHabitCompletion, toggleTaskCompletion, selectedDate, setSelectedDate, addTask, addNote, editHabit } = props;
+  const { tasks, notes, projects, habits, toggleHabitCompletion, toggleTaskCompletion, selectedDate, setSelectedDate, addTask, addNote, editHabit, habitLoading, habitHasMore, loadMoreHabits, habitError } = props;
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { user, signOut } = useAuth();
 
@@ -601,12 +633,16 @@ const Dashboard: React.FC<DashboardProps> = (props) => {
             {/* Side Column */}
             <div className="lg:col-span-2 space-y-6">
                 <StatsOverview tasks={tasks} projects={projects} />
-                <HabitTracker 
-                    habits={habits} 
-                    onToggle={toggleHabitCompletion} 
+                <HabitTracker
+                    habits={habits}
+                    onToggle={toggleHabitCompletion}
                     onEdit={editHabit}
                     onCreate={() => editHabit({ frequency: 'daily', target_count: 1 })}
-                    selectedDate={selectedDate} 
+                    selectedDate={selectedDate}
+                    loading={habitLoading}
+                    hasMore={habitHasMore}
+                    onLoadMore={loadMoreHabits}
+                    errorMessage={habitError}
                 />
                 <KeyProjects projects={projects} tasks={tasks} />
             </div>

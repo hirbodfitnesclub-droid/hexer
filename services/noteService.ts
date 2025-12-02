@@ -5,6 +5,12 @@ import { Note } from '../types';
 type NoteInsert = Omit<Note, 'id' | 'user_id' | 'created_at' | 'updated_at'>;
 type NoteUpdate = Partial<Omit<Note, 'id' | 'user_id' | 'created_at' | 'updated_at'>>;
 
+interface NoteQueryOptions {
+  limit?: number;
+  offset?: number;
+  userId?: string;
+}
+
 const triggerVectorization = (id: string, content: string) => {
     supabase.functions.invoke('vectorize', {
         body: { type: 'note', id, content }
@@ -13,14 +19,23 @@ const triggerVectorization = (id: string, content: string) => {
     }).catch(err => console.error("Vectorization error:", err));
 };
 
-export const getNotes = async (): Promise<Note[]> => {
-  const { data, error } = await supabase
+export const getNotes = async ({ limit = 20, offset = 0, userId }: NoteQueryOptions = {}) => {
+  const query = supabase
     .from('notes')
     .select('*')
     .order('created_at', { ascending: false });
 
+  if (userId) query.eq('user_id', userId);
+
+  const { data, error } = await query.range(offset, offset + limit);
+
   if (error) throw error;
-  return data as Note[];
+
+  const items = (data as Note[]) || [];
+  return {
+    items: items.slice(0, limit),
+    hasMore: items.length > limit
+  };
 };
 
 export const createNote = async (note: NoteInsert): Promise<Note> => {

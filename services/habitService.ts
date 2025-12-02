@@ -9,17 +9,35 @@ interface HabitCompletion {
     completion_date: string; // YYYY-MM-DD
 }
 
-export const getHabits = async (): Promise<Habit[]> => {
-    // Select all columns from the habits table. Assumes DB column is now 'name'.
-    const { data: habitsData, error: habitsError } = await supabase
+interface HabitQueryOptions {
+    limit?: number;
+    offset?: number;
+    userId?: string;
+    startDate?: string;
+    endDate?: string;
+}
+
+export const getHabits = async ({ limit = 20, offset = 0, userId, startDate, endDate }: HabitQueryOptions = {}) => {
+    const habitQuery = supabase
         .from('habits')
-        .select('*');
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (userId) habitQuery.eq('user_id', userId);
+
+    const { data: habitsData, error: habitsError } = await habitQuery.range(offset, offset + limit);
 
     if (habitsError) throw habitsError;
 
-    const { data: completionsData, error: completionsError } = await supabase
+    const completionsQuery = supabase
         .from('habit_completions')
         .select('habit_id, completion_date');
+
+    if (userId) completionsQuery.eq('user_id', userId);
+    if (startDate) completionsQuery.gte('completion_date', startDate);
+    if (endDate) completionsQuery.lte('completion_date', endDate);
+
+    const { data: completionsData, error: completionsError } = await completionsQuery;
 
     if (completionsError) throw completionsError;
 
@@ -30,11 +48,16 @@ export const getHabits = async (): Promise<Habit[]> => {
         completionsMap.set(comp.habit_id, dates);
     });
 
-    // Map the database response to include completion dates
-    return (habitsData as Habit[]).map(habit => ({
+    const items = (habitsData as Habit[]) || [];
+    const mapped = items.map(habit => ({
         ...habit,
         completedDates: completionsMap.get(habit.id) || []
     }));
+
+    return {
+        items: mapped.slice(0, limit),
+        hasMore: mapped.length > limit
+    };
 };
 
 export const createHabit = async (habit: HabitInsert) => {

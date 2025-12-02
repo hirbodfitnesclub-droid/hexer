@@ -77,7 +77,11 @@ const NotesView: React.FC<{
   deleteNote: (id: string) => void;
   addNote: (note: Omit<Note, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => void;
   updateNote: (note: Note) => void;
-}> = ({ notes, projects, tasks, addNote, updateNote, deleteNote }) => {
+  onLoadMore: () => void;
+  loading: boolean;
+  hasMore: boolean;
+  errorMessage?: string;
+}> = ({ notes, projects, tasks, addNote, updateNote, deleteNote, onLoadMore, loading, hasMore, errorMessage }) => {
     const [currentNote, setCurrentNote] = useState<Note | Partial<Note> | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     
@@ -141,11 +145,11 @@ const NotesView: React.FC<{
         </div>
 
         {/* Content Area */}
-        <div className="px-4 sm:px-8 pt-8 max-w-[1600px] mx-auto">
-            {filteredNotes.length > 0 ? (
-                // Masonry Layout using CSS Columns
-                <div className="columns-1 md:columns-2 xl:columns-3 gap-6 space-y-6">
-                    {filteredNotes.map(note => (
+          <div className="px-4 sm:px-8 pt-8 max-w-[1600px] mx-auto">
+              {filteredNotes.length > 0 ? (
+                  // Masonry Layout using CSS Columns
+                  <div className="columns-1 md:columns-2 xl:columns-3 gap-6 space-y-6">
+                      {filteredNotes.map(note => (
                         <NoteCard 
                             key={note.id} 
                             note={note} 
@@ -165,12 +169,37 @@ const NotesView: React.FC<{
                         ذهن شما پر از ایده است. اولین یادداشت خود را همین حالا ثبت کنید.
                     </p>
                 </div>
-            )}
-        </div>
-      
+              )}
+          </div>
+
+          {errorMessage && (
+              <div className="mx-4 sm:mx-8 mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-sm">
+                  {errorMessage}
+              </div>
+          )}
+          <div className="flex items-center justify-center py-6">
+              {loading && (
+                  <div className="flex items-center gap-2 text-zinc-400 text-sm">
+                      <span className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></span>
+                      در حال بارگذاری...
+                  </div>
+              )}
+              {!loading && hasMore && (
+                  <button
+                      onClick={onLoadMore}
+                      className="px-4 py-2 text-sm rounded-lg bg-zinc-900 border border-white/10 text-zinc-200 hover:bg-zinc-800 transition-colors"
+                  >
+                      نمایش یادداشت‌های بیشتر
+                  </button>
+              )}
+              {!loading && !hasMore && filteredNotes.length > 0 && (
+                  <p className="text-sm text-zinc-500">همه یادداشت‌ها نمایش داده شد.</p>
+              )}
+          </div>
+
        {/* Floating Action Button */}
-       <button 
-            onClick={openModalForNew} 
+       <button
+            onClick={openModalForNew}
             className="fixed bottom-24 right-8 w-16 h-16 bg-gradient-to-tr from-purple-600 to-fuchsia-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-purple-500/40 hover:scale-110 hover:rotate-90 transition-all duration-500 z-40 group"
        >
             <PlusIcon className="w-8 h-8"/>

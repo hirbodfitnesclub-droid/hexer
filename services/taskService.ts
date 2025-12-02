@@ -5,6 +5,14 @@ import { Task } from '../types';
 type TaskInsert = Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'status' | 'completed_at'>;
 type TaskUpdate = Partial<Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at'>>;
 
+interface TaskQueryOptions {
+  limit?: number;
+  offset?: number;
+  userId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
 const triggerVectorization = (id: string, content: string) => {
     // Fire-and-forget call to the edge function.
     // We do NOT await this.
@@ -15,14 +23,25 @@ const triggerVectorization = (id: string, content: string) => {
     }).catch(err => console.error("Vectorization error:", err));
 };
 
-export const getTasks = async (): Promise<Task[]> => {
-  const { data, error } = await supabase
+export const getTasks = async ({ limit = 20, offset = 0, userId, startDate, endDate }: TaskQueryOptions = {}) => {
+  const query = supabase
     .from('tasks')
     .select('*')
     .order('created_at', { ascending: false });
 
+  if (userId) query.eq('user_id', userId);
+  if (startDate) query.gte('due_date', startDate);
+  if (endDate) query.lte('due_date', endDate);
+
+  const { data, error } = await query.range(offset, offset + limit);
+
   if (error) throw error;
-  return data as Task[];
+
+  const items = (data as Task[]) || [];
+  return {
+    items: items.slice(0, limit),
+    hasMore: items.length > limit
+  };
 };
 
 export const createTask = async (task: TaskInsert): Promise<Task> => {

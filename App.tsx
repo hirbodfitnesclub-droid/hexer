@@ -78,6 +78,12 @@ const MainApp: React.FC = () => {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
+  const PAGE_SIZE = 20;
+  const [projectsState, setProjectsState] = useState({ offset: 0, hasMore: true, loading: false, error: null as string | null });
+  const [tasksState, setTasksState] = useState({ offset: 0, hasMore: true, loading: false, error: null as string | null });
+  const [notesState, setNotesState] = useState({ offset: 0, hasMore: true, loading: false, error: null as string | null });
+  const [habitsState, setHabitsState] = useState({ offset: 0, hasMore: true, loading: false, error: null as string | null });
+
   // Global Modals State
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
@@ -86,6 +92,14 @@ const MainApp: React.FC = () => {
 
 
   const { user } = useAuth();
+
+  const { startDateISO, endDateISO } = React.useMemo(() => {
+    const start = new Date(selectedDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(selectedDate);
+    end.setHours(23, 59, 59, 999);
+    return { startDateISO: start.toISOString(), endDateISO: end.toISOString() };
+  }, [selectedDate]);
 
   const addNotification = useCallback((message: string, type: 'success' | 'error' = 'success', action?: AppNotification['action']) => {
     const id = Date.now();
@@ -98,6 +112,108 @@ const MainApp: React.FC = () => {
   const removeNotification = (id: number) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
+
+  const fetchProjects = useCallback(async (reset = false) => {
+    if (!user) return;
+    let currentOffset = 0;
+    setProjectsState(prev => {
+      currentOffset = reset ? 0 : prev.offset;
+      return { ...prev, loading: true, error: null, ...(reset ? { offset: 0, hasMore: true } : {}) };
+    });
+
+    try {
+      const { items, hasMore } = await projectService.getProjects({ limit: PAGE_SIZE, offset: currentOffset, userId: user.id });
+      setProjects(prev => {
+        const newItems = reset ? items : [...prev, ...items.filter(item => !prev.find(p => p.id === item.id))];
+        return newItems;
+      });
+      setProjectsState({ offset: currentOffset + items.length, hasMore, loading: false, error: null });
+    } catch (error: any) {
+      setProjectsState(prev => ({ ...prev, loading: false, error: error?.message || 'خطا در بارگذاری پروژه‌ها' }));
+      addNotification("خطا در بارگذاری پروژه‌ها.", "error");
+    }
+  }, [PAGE_SIZE, user, addNotification]);
+
+  const fetchNotes = useCallback(async (reset = false) => {
+    if (!user) return;
+    let currentOffset = 0;
+    setNotesState(prev => {
+      currentOffset = reset ? 0 : prev.offset;
+      return { ...prev, loading: true, error: null, ...(reset ? { offset: 0, hasMore: true } : {}) };
+    });
+
+    try {
+      const { items, hasMore } = await noteService.getNotes({ limit: PAGE_SIZE, offset: currentOffset, userId: user.id });
+      setNotes(prev => {
+        const newItems = reset ? items : [...prev, ...items.filter(item => !prev.find(n => n.id === item.id))];
+        return newItems;
+      });
+      setNotesState({ offset: currentOffset + items.length, hasMore, loading: false, error: null });
+    } catch (error: any) {
+      setNotesState(prev => ({ ...prev, loading: false, error: error?.message || 'خطا در بارگذاری یادداشت‌ها' }));
+      addNotification("خطا در بارگذاری یادداشت‌ها.", "error");
+    }
+  }, [PAGE_SIZE, user, addNotification]);
+
+  const fetchTasks = useCallback(async (reset = false) => {
+    if (!user) return;
+    let currentOffset = 0;
+    setTasksState(prev => {
+      currentOffset = reset ? 0 : prev.offset;
+      return { ...prev, loading: true, error: null, ...(reset ? { offset: 0, hasMore: true } : {}) };
+    });
+
+    try {
+      const { items, hasMore } = await taskService.getTasks({
+        limit: PAGE_SIZE,
+        offset: currentOffset,
+        userId: user.id,
+        startDate: startDateISO,
+        endDate: endDateISO
+      });
+      setTasks(prev => {
+        const newItems = reset ? items : [...prev, ...items.filter(item => !prev.find(t => t.id === item.id))];
+        return newItems;
+      });
+      setTasksState({ offset: currentOffset + items.length, hasMore, loading: false, error: null });
+    } catch (error: any) {
+      setTasksState(prev => ({ ...prev, loading: false, error: error?.message || 'خطا در بارگذاری کارها' }));
+      addNotification("خطا در بارگذاری کارها.", "error");
+    }
+  }, [PAGE_SIZE, user, addNotification, startDateISO, endDateISO]);
+
+  const fetchHabits = useCallback(async (reset = false) => {
+    if (!user) return;
+    let currentOffset = 0;
+    setHabitsState(prev => {
+      currentOffset = reset ? 0 : prev.offset;
+      return { ...prev, loading: true, error: null, ...(reset ? { offset: 0, hasMore: true } : {}) };
+    });
+
+    try {
+      const { items, hasMore } = await habitService.getHabits({
+        limit: PAGE_SIZE,
+        offset: currentOffset,
+        userId: user.id,
+        startDate: startDateISO,
+        endDate: endDateISO
+      });
+      setHabits(prev => {
+        const newItems = reset ? items : [...prev, ...items.filter(item => !prev.find(h => h.id === item.id))];
+        return newItems;
+      });
+      setHabitsState({ offset: currentOffset + items.length, hasMore, loading: false, error: null });
+    } catch (error: any) {
+      setHabitsState(prev => ({ ...prev, loading: false, error: error?.message || 'خطا در بارگذاری عادت‌ها' }));
+      addNotification("خطا در بارگذاری عادت‌ها.", "error");
+    }
+  }, [PAGE_SIZE, user, addNotification, startDateISO, endDateISO]);
+
+  const isDateInSelectedRange = useCallback((dateString?: string | null) => {
+    if (!dateString) return false;
+    const value = new Date(dateString).getTime();
+    return value >= new Date(startDateISO).getTime() && value <= new Date(endDateISO).getTime();
+  }, [startDateISO, endDateISO]);
   
   // --- Data Fetching and Real-time Subscriptions ---
   useEffect(() => {
@@ -106,16 +222,12 @@ const MainApp: React.FC = () => {
     const fetchData = async () => {
       setLoadingData(true);
       try {
-        const [projectsData, tasksData, notesData, habitsData] = await Promise.all([
-          projectService.getProjects(),
-          taskService.getTasks(),
-          noteService.getNotes(),
-          habitService.getHabits()
+        await Promise.all([
+          fetchProjects(true),
+          fetchNotes(true),
+          fetchTasks(true),
+          fetchHabits(true)
         ]);
-        setProjects(projectsData);
-        setTasks(tasksData);
-        setNotes(notesData);
-        setHabits(habitsData);
       } catch (error) {
         console.error("Error fetching initial data:", error);
         addNotification("خطا در بارگذاری اطلاعات اولیه.", "error");
@@ -139,6 +251,24 @@ const MainApp: React.FC = () => {
     const handleDeletes = <T extends {id: string}>(payload: any, setter: React.Dispatch<React.SetStateAction<T[]>>) => {
         setter(prev => prev.filter(item => item.id !== payload.old.id));
     };
+
+    const handleTaskInsert = (payload: any) => {
+        if (!isDateInSelectedRange(payload.new.due_date)) return;
+        setTasks(prev => {
+            if (prev.find(item => item.id === payload.new.id)) return prev;
+            return [payload.new as Task, ...prev];
+        });
+    };
+
+    const handleTaskUpdate = (payload: any) => {
+        setTasks(prev => {
+            const inRange = isDateInSelectedRange(payload.new.due_date);
+            if (!inRange) return prev.filter(item => item.id !== payload.new.id);
+            const exists = prev.some(item => item.id === payload.new.id);
+            if (!exists) return prev;
+            return prev.map(item => item.id === payload.new.id ? payload.new as Task : item);
+        });
+    };
     
     // FIX: Use unique channel names for each subscription to prevent conflicts and ensure reliable real-time updates.
     const projectChanges = supabase.channel('projects-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, 
@@ -148,10 +278,10 @@ const MainApp: React.FC = () => {
             else if (payload.eventType === 'DELETE') handleDeletes(payload, setProjects);
         }).subscribe();
         
-    const taskChanges = supabase.channel('tasks-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, 
+    const taskChanges = supabase.channel('tasks-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' },
         (payload) => {
-            if (payload.eventType === 'INSERT') handleInserts(payload, setTasks);
-            else if (payload.eventType === 'UPDATE') handleUpdates(payload, setTasks);
+            if (payload.eventType === 'INSERT') handleTaskInsert(payload);
+            else if (payload.eventType === 'UPDATE') handleTaskUpdate(payload);
             else if (payload.eventType === 'DELETE') handleDeletes(payload, setTasks);
         }).subscribe();
         
@@ -164,14 +294,12 @@ const MainApp: React.FC = () => {
 
     const habitChanges = supabase.channel('habits-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'habits' },
         async () => {
-            const habitsData = await habitService.getHabits();
-            setHabits(habitsData);
+            await fetchHabits(true);
         }).subscribe();
-        
+
     const habitCompletionChanges = supabase.channel('habit-completions-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'habit_completions' },
         async () => {
-            const habitsData = await habitService.getHabits();
-            setHabits(habitsData);
+            await fetchHabits(true);
         }).subscribe();
 
     return () => {
@@ -182,7 +310,7 @@ const MainApp: React.FC = () => {
       supabase.removeChannel(habitCompletionChanges);
     };
 
-  }, [user, addNotification]);
+  }, [user, addNotification, fetchProjects, fetchNotes, fetchTasks, fetchHabits, isDateInSelectedRange]);
 
   // --- CRUD Handlers ---
 
@@ -384,6 +512,26 @@ const MainApp: React.FC = () => {
       setEditingHabit(null);
   }
 
+  const loadMoreTasks = () => {
+    if (tasksState.loading || !tasksState.hasMore) return;
+    fetchTasks(false);
+  };
+
+  const loadMoreNotes = () => {
+    if (notesState.loading || !notesState.hasMore) return;
+    fetchNotes(false);
+  };
+
+  const loadMoreProjects = () => {
+    if (projectsState.loading || !projectsState.hasMore) return;
+    fetchProjects(false);
+  };
+
+  const loadMoreHabits = () => {
+    if (habitsState.loading || !habitsState.hasMore) return;
+    fetchHabits(false);
+  };
+
 
   const renderContent = () => {
     if (loadingData) {
@@ -396,23 +544,26 @@ const MainApp: React.FC = () => {
     
     switch (currentPage) {
       case Page.Dashboard:
-        return <Dashboard 
+        return <Dashboard
             tasks={tasks} notes={notes} projects={projects} habits={habits}
             toggleHabitCompletion={handleToggleHabit} toggleTaskCompletion={handleToggleTask}
             selectedDate={selectedDate} setSelectedDate={setSelectedDate}
             addTask={handleAddTask} addNote={handleAddNote}
             editHabit={setEditingHabit}
+            habitLoading={habitsState.loading} habitHasMore={habitsState.hasMore} loadMoreHabits={loadMoreHabits} habitError={habitsState.error || undefined}
         />;
       case Page.Tasks:
-        return <TasksView 
+        return <TasksView
             tasks={tasks} projects={projects} notes={notes}
             addTask={handleAddTask} updateTask={handleUpdateTask}
             toggleTaskCompletion={handleToggleTask} deleteTask={handleDeleteTask}
+            onLoadMore={loadMoreTasks} loading={tasksState.loading} hasMore={tasksState.hasMore} errorMessage={tasksState.error || undefined}
         />;
       case Page.Notes:
-        return <NotesView 
+        return <NotesView
             notes={notes} projects={projects} tasks={tasks}
             addNote={handleAddNote} updateNote={handleUpdateNote} deleteNote={handleDeleteNote}
+            onLoadMore={loadMoreNotes} loading={notesState.loading} hasMore={notesState.hasMore} errorMessage={notesState.error || undefined}
         />;
       case Page.Projects:
           return <ProjectsView
@@ -420,6 +571,7 @@ const MainApp: React.FC = () => {
             addProject={handleAddProject} updateProject={handleUpdateProject} deleteProject={handleDeleteProject}
             updateTask={handleUpdateTask} deleteTask={handleDeleteTask}
             updateNote={handleUpdateNote} deleteNote={handleDeleteNote}
+            onLoadMore={loadMoreProjects} loading={projectsState.loading} hasMore={projectsState.hasMore} errorMessage={projectsState.error || undefined}
             editingProject={editingProject} setEditingProject={setEditingProject}
           />;
       case Page.Chat:
@@ -431,12 +583,13 @@ const MainApp: React.FC = () => {
             onInjectResult={handleInjectResult}
         />;
       default:
-        return <Dashboard 
+        return <Dashboard
             tasks={tasks} notes={notes} projects={projects} habits={habits}
             toggleHabitCompletion={handleToggleHabit} toggleTaskCompletion={handleToggleTask}
             selectedDate={selectedDate} setSelectedDate={setSelectedDate}
             addTask={handleAddTask} addNote={handleAddNote}
             editHabit={setEditingHabit}
+            habitLoading={habitsState.loading} habitHasMore={habitsState.hasMore} loadMoreHabits={loadMoreHabits} habitError={habitsState.error || undefined}
         />;
     }
   };
