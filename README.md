@@ -4,20 +4,19 @@
 
 # Run and deploy your AI Studio app
 
-This contains everything you need to run your app locally.
+This contains everything you need to run your app locally or inside an online workspace such as Google AI Studio (no local machine setup required).
 
 View your app in AI Studio: https://ai.studio/apps/drive/1jPztVSq35oScCpJqmp29rZsGDnpBvK3I
 
-## Run Locally
+## Run Locally or in an Online Workspace
 
-**Prerequisites:**  Node.js
+**Prerequisites:**  Node.js (available in your online workspace terminal)
 
 
-1. Install dependencies:
+1. Install dependencies from the built-in terminal (local or hosted):
    `npm install`
-2. Copy the sample environment file and set your secrets:
-   - `cp .env.example .env`
-   - Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to a freshly issued Supabase URL and anon key (rotate any old keys in the Supabase dashboard to invalidate leaked credentials).
-   - Set `GEMINI_API_KEY` to your Gemini API key.
+2. Configure environment variables:
+   - For online platforms (e.g., Google AI Studio), add `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `GEMINI_API_KEY` in the environment settings panel.
+   - For local development, copy the sample env file: `cp .env.example .env`, then set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to freshly issued Supabase credentials (rotate any old keys in the Supabase dashboard) and `GEMINI_API_KEY` to your Gemini API key.
 3. Run the app:
    `npm run dev`
