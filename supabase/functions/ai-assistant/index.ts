@@ -12,6 +12,109 @@ declare const Deno: any;
 const API_KEY = Deno.env.get('GEMINI_API_KEY');
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
+const safetySettings = [
+  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+  { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+];
+
+function validateAiResult(aiResult: any) {
+  const errors: string[] = [];
+
+  if (typeof aiResult !== 'object' || aiResult === null) {
+    errors.push('Result must be an object');
+    return { valid: false, errors };
+  }
+
+  if (aiResult.transcription && typeof aiResult.transcription !== 'string') {
+    errors.push('transcription must be a string');
+  }
+
+  if (aiResult.reply && typeof aiResult.reply !== 'string') {
+    errors.push('reply must be a string');
+  }
+
+  if (aiResult.citations && !Array.isArray(aiResult.citations)) {
+    errors.push('citations must be an array if provided');
+  }
+
+  if (aiResult.actions !== undefined) {
+    if (!Array.isArray(aiResult.actions)) {
+      errors.push('actions must be an array');
+    } else {
+      aiResult.actions.forEach((action: any, index: number) => {
+        if (typeof action !== 'object' || action === null) {
+          errors.push(`actions[${index}] must be an object`);
+          return;
+        }
+        if (typeof action.action !== 'string') {
+          errors.push(`actions[${index}].action must be a string`);
+        }
+        if (action.params !== undefined && typeof action.params !== 'object') {
+          errors.push(`actions[${index}].params must be an object if provided`);
+        }
+      });
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+async function runTranscriptionStage(ai: any, options: { message?: string; audio?: any; image?: any; history: any[]; }) {
+  const { message, audio, image, history } = options;
+
+  if (!audio && !image) {
+    return message || '';
+  }
+
+  const transcriptionPrompt = `
+    You are a Persian transcription engine.
+    - If AUDIO is present: return EXACT spoken words.
+    - If IMAGE is present: perform STRICT OCR and copy text exactly (no translation, no summarization).
+    Only return a JSON object with the 'transcription' field. Do not add any other commentary.
+  `;
+
+  const userParts: any[] = [];
+  if (message) userParts.push({ text: message });
+  if (audio) {
+    userParts.push({ inlineData: { mimeType: audio.mimeType, data: audio.data } });
+  }
+  if (image) {
+    userParts.push({ inlineData: { mimeType: image.mimeType, data: image.data } });
+  }
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-lite',
+    contents: [
+      ...history.slice(-1).map((h: any) => ({ role: h.sender === 'user' ? 'user' : 'model', parts: [{ text: h.text }] })),
+      { role: 'user', parts: userParts }
+    ],
+    config: {
+      responseMimeType: 'application/json',
+      systemInstruction: transcriptionPrompt,
+      temperature: 0.0,
+      maxOutputTokens: 2048,
+      safetySettings
+    }
+  });
+
+  const rawText = response.text;
+  console.log('Raw Transcription Output:', rawText);
+
+  try {
+    const cleanText = rawText?.replace(/```json\n?|\n?```/g, '').trim() || '{}';
+    const parsed = JSON.parse(cleanText);
+    if (parsed && typeof parsed.transcription === 'string') {
+      return parsed.transcription;
+    }
+  } catch (error) {
+    console.error('Transcription Parse Error:', error);
+  }
+
+  return message || '';
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -31,6 +134,9 @@ Deno.serve(async (req) => {
 
     let context = "";
     let citations: any[] = [];
+
+    // Stage 1: dedicated transcription/OCR extraction
+    const finalTranscription = await runTranscriptionStage(ai, { message, audio, image, history });
 
     // --- MODE 1: MEMORY (RAG) ---
     // Skip RAG if media is present, focus on media analysis first
@@ -101,25 +207,19 @@ Deno.serve(async (req) => {
     Today's Persian Date: ${persianDate}
 
     **INSTRUCTIONS:**
-    1. **Transcribe/OCR First (CRITICAL):** 
-       - If AUDIO is present: Write EXACTLY what you hear. Capture the exact spoken words.
-       - If IMAGE is present: Perform **STRICT OCR**. Write down the text **EXACTLY** as it appears in the image. 
-         * **DO NOT TRANSLATE** specific terms (e.g., if image says "رپورتاژ", write "رپورتاژ", DO NOT write "report" or "reportz").
-         * **DO NOT SUMMARIZE** text in this step. Copy it.
-       - Store this raw text in the 'transcription' field.
+    1. **Use Provided Transcription Only:** The text is already transcribed/OCR'd. Do NOT redo OCR/ASR. Ignore UI chrome (battery/time) if the source was a screenshot.
     2. **Analyze:** Based on the transcription, identify ALL user intents.
-       - If analysing a SCREENSHOT (e.g., chat app): Ignore UI elements (battery, time). Focus on the *content* of the messages.
     3. **Decompose:** Break complex requests into a list of actions.
        - "Buy milk and remind me to call Ali" -> 2 actions: CREATE_TASK("Buy milk"), CREATE_TASK("Call Ali").
     4. **Dates:** Convert relative dates (tomorrow, next friday) to YYYY-MM-DD using Today's Gregorian Date.
        - Understand Persian relative dates like "پنجم برج بعد" using Today's Persian Date as reference.
-    5. **Clean Titles:** 
+    5. **Clean Titles:**
        - If a date is extracted to 'dueDate', DO NOT include the time word in the 'title'.
        - Use the exact Persian terminology found in the transcription/OCR.
     6. **Response Format:** You MUST return a VALID JSON object (no markdown, no code blocks) with this exact structure:
 
     {
-      "transcription": "Text of what was said/written/seen",
+      "transcription": "Text already provided to you",
       "reply": "Conversational Persian response summarizing what was done",
       "actions": [
         {
@@ -139,43 +239,24 @@ Deno.serve(async (req) => {
         }
       ]
     }
-    
-    **CONTEXT:**
+
+    **CONTEXT (for inference and citations only):**
     ${context}
     `;
 
-    const userMessageParts: any[] = [];
-    if (message) userMessageParts.push({ text: message });
-    if (audio) {
-      userMessageParts.push({
-        inlineData: {
-          mimeType: audio.mimeType,
-          data: audio.data
-        }
-      });
-    }
-    if (image) {
-      userMessageParts.push({
-        inlineData: {
-          mimeType: image.mimeType,
-          data: image.data
-        }
-      });
-    }
+    const inferenceUserPrompt = `
+    TRANSCRIPTION (source text):
+    ${finalTranscription || message || ''}
 
-    // Safety Settings: BLOCK_NONE to prevent false positives on audio/images
-    const safetySettings = [
-      { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-      { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-      { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-      { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-    ];
+    MODE: ${mode}
+    Remember: Do not redo OCR/ASR. Only reason over the provided transcription and metadata.
+    `;
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-lite',
       contents: [
         ...history.slice(-3).map((h: any) => ({ role: h.sender === 'user' ? 'user' : 'model', parts: [{ text: h.text }] })),
-        { role: 'user', parts: userMessageParts }
+        { role: 'user', parts: [{ text: inferenceUserPrompt }] }
       ],
       config: {
         responseMimeType: 'application/json',
@@ -183,7 +264,7 @@ Deno.serve(async (req) => {
         systemInstruction: systemPrompt,
         temperature: 0.0,
         maxOutputTokens: 8192,
-        safetySettings: safetySettings
+        safetySettings
       }
     });
 
@@ -198,6 +279,20 @@ Deno.serve(async (req) => {
     } catch (e) {
         console.error("JSON Parse Error. Raw Text:", rawText);
         throw new Error("Failed to parse AI response. The model might have hallucinated or returned invalid JSON.");
+    }
+
+    const validation = validateAiResult(aiResult);
+    if (!validation.valid) {
+        console.error('AI Output Validation Failed:', validation.errors);
+        return new Response(JSON.stringify({
+            reply: "خروجی مدل معتبر نبود. لطفاً دوباره تلاش کنید.",
+            citations: citations,
+            actionResults: [],
+            transcription: finalTranscription
+        }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+        });
     }
 
     const { actions, transcription, reply } = aiResult;
@@ -273,7 +368,7 @@ Deno.serve(async (req) => {
         reply: reply || "انجام شد.",
         citations: citations,
         actionResults: actionResults,
-        transcription: transcription 
+        transcription: transcription || finalTranscription
     }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
