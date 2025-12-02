@@ -1,11 +1,23 @@
-
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://anhgnopgsnmxmwxwnytd.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFuaGdub3Bnc25teG13eHdueXRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxODA4ODQsImV4cCI6MjA3OTc1Njg4NH0.5qPHR4EeHthE-AjT1eb2qR6UzqV8hehJDmJ5J3Kz7q4';
+const supabaseUrl =
+  (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_SUPABASE_URL : undefined) ||
+  (typeof process !== 'undefined' ? (process as any).env?.VITE_SUPABASE_URL : undefined);
+
+const supabaseAnonKey =
+  (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_SUPABASE_ANON_KEY : undefined) ||
+  (typeof process !== 'undefined' ? (process as any).env?.VITE_SUPABASE_ANON_KEY : undefined);
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Supabase URL and Anon Key must be provided.');
+  const missing = [
+    !supabaseUrl ? 'VITE_SUPABASE_URL' : null,
+    !supabaseAnonKey ? 'VITE_SUPABASE_ANON_KEY' : null,
+  ].filter(Boolean);
+  throw new Error(
+    `Supabase configuration missing: ${missing.join(
+      ', ',
+    )}. Set these in your hosting environment (e.g., Google AI Studio env settings) or a local .env file.`,
+  );
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
