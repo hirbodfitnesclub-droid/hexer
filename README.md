@@ -19,6 +19,16 @@ View your app in AI Studio: https://ai.studio/apps/drive/1jPztVSq35oScCpJqmp29rZ
 3. Run the app:
    `npm run dev`
 
+## Environment variables
+
+Use the provided [.env.example](.env.example) as a template when running the project in fully online sandboxes (e.g., Google AI Studio, StackBlitz, or GitHub Codespaces):
+
+- `VITE_SUPABASE_URL` – your Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` – your Supabase public anon key
+- `GEMINI_API_KEY` – API key used by the `ai-assistant` Edge Function
+
+Copy the file to `.env` or `.env.local` and fill in your secrets via the platform’s UI; avoid committing actual keys to the repository.
+
 ## حالت بدون نصب و استفاده از استورها
 
 در محیط‌های آنلاین بدون دسترسی به CLI می‌توانید برای تست و ساخت کامپوننت‌ها مستقیماً از استورهای دامنه‌ای استفاده کنید:
